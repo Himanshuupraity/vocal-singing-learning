@@ -8,7 +8,8 @@ import { hashString } from './dates';
  * chooses which copy to keep.
  */
 export interface SyncMeta {
-  email?: string;
+  /** The learner profile this device is signed in to. */
+  name?: string;
   version?: number;
   syncedAt?: string;
   hashAtSync?: number;
@@ -46,12 +47,19 @@ async function api<T>(url: string, init: RequestInit = {}): Promise<{ status: nu
   return { status: r.status, body };
 }
 
+export interface ProfileSummary {
+  id: string;
+  name: string;
+  lastActive: string | null;
+}
+
 export const account = {
-  me: () => api<{ email: string; sync: { version: number; updatedAt: string } | null; message?: string }>('/api/auth/me'),
-  register: (email: string, password: string) => api<{ email: string; message?: string }>('/api/auth/register', { method: 'POST', body: JSON.stringify({ email, password }) }),
-  login: (email: string, password: string) => api<{ email: string; message?: string }>('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  profiles: () => api<{ profiles: ProfileSummary[]; persistent: boolean; message?: string }>('/api/profiles'),
+  me: () => api<{ id: string; name: string; sync: { version: number; updatedAt: string } | null; message?: string }>('/api/auth/me'),
+  create: (name: string, pin: string) => api<{ id: string; name: string; message?: string }>('/api/profiles', { method: 'POST', body: JSON.stringify({ name, pin }) }),
+  unlock: (id: string, pin: string) => api<{ id: string; name: string; message?: string }>(`/api/profiles/${encodeURIComponent(id)}/unlock`, { method: 'POST', body: JSON.stringify({ pin }) }),
   logout: () => api('/api/auth/logout', { method: 'POST' }),
-  remove: (password: string) => api<{ message?: string }>('/api/auth/account', { method: 'DELETE', body: JSON.stringify({ password }) }),
+  remove: (pin: string) => api<{ message?: string }>('/api/profiles/me', { method: 'DELETE', body: JSON.stringify({ pin }) }),
 };
 
 export type SyncOutcome =
@@ -86,7 +94,8 @@ export async function syncNow(local: AppData): Promise<SyncOutcome> {
     const meta = loadMeta();
     const r = await api<{ data: unknown; version: number; updatedAt: string; message?: string }>('/api/sync');
     if (r.status === 401) return { kind: 'logged-out' };
-    if (r.status === 404) return push(local, 0);
+    // Nothing saved yet: upload this device's progress, but never a blank, not-yet-onboarded copy.
+    if (r.status === 404) return isFresh(local) ? { kind: 'up-to-date' } : push(local, 0);
     if (r.status !== 200) return { kind: 'error', message: r.body.message ?? `Sync failed (${r.status}).` };
     const server = { data: migrate(r.body.data).data, version: r.body.version, updatedAt: r.body.updatedAt };
     if (meta.version === undefined) {

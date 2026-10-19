@@ -9,9 +9,10 @@ import { youtubeRouter } from './routes/youtube';
 import { songsRouter } from './routes/songs';
 import { clientErrorsRouter } from './routes/clientErrors';
 import { accountRouter } from './routes/account';
-import { Store } from './lib/store';
+import { openStore, type Store } from './lib/store';
 
-export function createApp(cfg: ServerConfig, deps: { makeClient?: ClientFactory; makeGemini?: GeminiFactory; fetchImpl?: typeof fetch; serveStatic?: boolean; logDir?: string; dataDir?: string } = {}) {
+export function createApp(cfg: ServerConfig, deps: { makeClient?: ClientFactory; makeGemini?: GeminiFactory; fetchImpl?: typeof fetch; serveStatic?: boolean; logDir?: string; dataDir?: string; store?: Store } = {}) {
+  const store = deps.store ?? openStore({ databaseUrl: cfg.databaseUrl, dataDir: deps.dataDir ?? process.env.DATA_DIR ?? 'data' });
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', 1);
@@ -38,7 +39,7 @@ export function createApp(cfg: ServerConfig, deps: { makeClient?: ClientFactory;
       tutor: { configured: !!cfg.tutorProvider, provider: cfg.tutorProvider, model: tutorModel(cfg) },
       youtube: { configured: !!cfg.youtubeKey },
       songs: { configured: true, provider: 'iTunes Search API' },
-      accounts: { enabled: true },
+      accounts: { enabled: true, persistent: store.persistent },
     });
   });
 
@@ -51,7 +52,6 @@ export function createApp(cfg: ServerConfig, deps: { makeClient?: ClientFactory;
   app.use('/api', songsRouter(deps.fetchImpl));
   app.use('/api/client-errors', rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: 'draft-8', legacyHeaders: false }));
   app.use('/api', clientErrorsRouter(deps.logDir));
-  const store = new Store(deps.dataDir ?? process.env.DATA_DIR ?? 'data');
   app.use('/api', accountRouter(store));
   app.use('/api', (_, res) => res.status(404).json({ error: 'not_found' }));
 

@@ -41,7 +41,7 @@ Everything except live AI answers and live YouTube results:
 - Recording Journal with **pitch analysis of saved recordings**
 - Physically-modelled tanpura drone and optional voice-like “aa” demo sound
 - Installable **PWA** with offline support, daily reminders (in-app/notifications) and a calendar (.ics) reminder
-- Optional **accounts & cross-device sync** (self-hosted SQLite — no third-party service)
+- Optional **“Who’s practising?” learner profiles** (name + 4-digit PIN) for cross-device sync — Postgres via `DATABASE_URL`, or self-hosted SQLite
 - Self-hosted crash reporting and a privacy policy page
 - Daily Riyaz planner and session runner (timer, skip / repeat / stop, checklist, summary, reflection)
 - Practice Studio: tanpura-style drone, pitch matcher, sargam player, metronome & taal (Teentaal, Keharwa, Dadra), tap-along rhythm test, pitch game, ear training, virtual keyboard, Recording Journal
@@ -88,7 +88,7 @@ Browser (React + TypeScript + Vite + Tailwind)
                       ├─ POST /api/songs/plan   → Claude (SSE streaming)
                       ├─ GET  /api/youtube/search → YouTube Data API v3 (cached, quota-aware)
                       ├─ GET  /api/songs/search → iTunes Search API (IN storefront)
-                      ├─ /api/auth/*, /api/sync → optional accounts + sync (node:sqlite, scrypt, httpOnly cookie)
+                      ├─ /api/profiles, /api/auth/*, /api/sync → learner profiles + sync (Postgres or node:sqlite, scrypt, httpOnly cookie)
                       ├─ POST /api/client-errors → self-hosted crash log (logs/client-errors.log)
                       └─ GET  /api/status       → which features are configured
 ```
@@ -139,14 +139,15 @@ tests/                 Vitest: pitch detection, scoring, storage/migration, curr
 
 ---
 
-## Accounts & sync (optional, no API key)
+## Learner profiles & sync (optional, no API key)
 
-Learners can create an account in **Settings → Account & sync** to use the same progress on several devices.
+A fresh device opens on **“Who’s practising?”**: saved learners’ names are listed; tapping a name and entering its **4-digit PIN** loads that learner’s progress. New learners pick a name + PIN, then go through onboarding. On a device that already has progress, use **Settings → Your name & sync** to save it under a name. **Switch learner** (sidebar) saves the current learner’s progress, then clears the device for someone else.
 
-- Stored on your server in `DATA_DIR/sursadhana.db` (Node's built-in SQLite): email, an **scrypt** password hash (never the password), and a copy of learning data. Recordings are never synced.
-- Sessions use an **httpOnly, SameSite=Lax** cookie (Secure over HTTPS) plus a required custom header on state-changing requests (CSRF protection). Login/registration are rate-limited, and failed logins return the same message whether or not the email exists.
-- Sync is whole-document with version numbers. It never silently overwrites: if two devices changed since the last sync, the learner chooses which copy to keep.
-- Learners can log out or delete their account (password required). Back up `DATA_DIR` in production.
+- **Storage:** Postgres when `DATABASE_URL` (or `POSTGRES_URL`) is set — required on Vercel, whose disk is wiped (a free Neon database from the Vercel Marketplace works). Without it, Node's built-in SQLite in `DATA_DIR/sursadhana.db`. Stored: the name, an **scrypt** hash of the PIN (never the PIN), and a copy of learning data. Recordings are never synced.
+- **Trade-off:** names are public to anyone who opens the site; progress needs the PIN. A 4-digit PIN is weak on its own, so **5 wrong PINs lock that name for 15 minutes** (enforced in the database), plus a per-IP rate limit.
+- Sessions use an **httpOnly, SameSite=Lax** cookie (Secure over HTTPS, 180 days) plus a required custom header on state-changing requests (CSRF protection).
+- Sync is whole-document with version numbers, written with single conditional SQL statements. It never silently overwrites: if two devices changed since the last sync, the learner chooses which copy to keep.
+- Learners can remove their name and its server copy (PIN required).
 
 ## Install, offline & reminders
 
@@ -157,7 +158,7 @@ SurSadhana is a Progressive Web App: “Install app” in Chrome/Edge, or Share 
 - Mic audio is analysed live in the browser and never uploaded.
 - Recordings are saved only after explicit consent, only in this browser’s IndexedDB, and can be deleted individually or all at once (Settings).
 - The AI tutor receives a compact summary (level, lesson titles, measured scores, practice stats, saved memory notes), never audio or the full database.
-- Progress lives in localStorage on this device unless you create an account. Use **Export** for backups.
+- Progress lives in localStorage on this device unless you save it under your name. Use **Export** for backups.
 - The full policy is in the app at `/privacy`. If you publish the site, add the operator's contact details to it.
 
 ## Copyright safeguards
@@ -186,7 +187,7 @@ GitHub Actions (`.github/workflows/ci.yml`) runs type-check, unit tests and Play
 - onboarding, persistence, quiz gating and unlocking
 - every page rendering without console errors, and the audio tools
 - riyaz sessions, demo tutor mode, and saving videos without a key
-- Hindi lessons, account creation and second-device sync
+- Hindi lessons, saving under a name + PIN and opening it on a second device
 - no horizontal scroll at 375px, mic pitch matching with a synthetic voice (Chromium)
 - an **axe WCAG 2.1 AA audit** of 14 pages in light and dark mode
 
@@ -200,7 +201,7 @@ GitHub Actions (`.github/workflows/ci.yml`) runs type-check, unit tests and Play
 - server routes with mocked Claude/YouTube/iTunes: validation, SSE streaming, quota exhaustion, not-configured states
 - app smoke tests: onboarding, persistence across reloads, locked lessons, learning path
 - Karplus–Strong string tuning (±3 cents), offline recording analysis, onset detection, interval/sequence generators
-- accounts (hashing, CSRF, sessions, conflicts, deletion), client sync logic, reminders/.ics, YouTube URL parsing
+- learner profiles on SQLite **and** Postgres (PGlite): PIN hashing, lockout, CSRF, sessions, conflicts, deletion; the “Who’s practising?” screen, client sync logic, reminders/.ics, YouTube URL parsing
 
 ## Known limitations
 
@@ -211,6 +212,6 @@ GitHub Actions (`.github/workflows/ci.yml`) runs type-check, unit tests and Play
 - **Song analysis** (difficulty, raga influence, range) is AI-generated and labelled as an estimate. Phrase segmentation is manual.
 - **Curriculum review:** all four levels were reviewed for accuracy (21 corrections) and translated to Hindi by AI. A review by a human Hindustani vocal teacher is still recommended before publishing widely.
 - **Reminders** fire only while the app is open (or via the calendar file). True background push would need a push service.
-- **Sync** keeps one whole copy per account and asks on conflict; it doesn't merge per item.
+- **Sync** keeps one whole copy per learner and asks on conflict; it doesn't merge per item.
 - **Real-voice testing:** pitch detection was verified with synthetic tones in Chromium and WebKit. Try it with your own voice, ideally with headphones. Very breathy singing, room echo or speakers playing music can reduce accuracy.
 - **Rhythm timing** includes device audio latency. The sing-in-rhythm test reports a latency-independent steadiness score, and Bluetooth audio can add delay.

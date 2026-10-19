@@ -6,7 +6,7 @@ import { useApplyTheme } from './hooks/useTheme';
 import { useAppData } from './state/AppData';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
-const Onboarding = lazy(() => import('./pages/Onboarding'));
+const Welcome = lazy(() => import('./pages/Welcome'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const LearningPath = lazy(() => import('./pages/LearningPath'));
 const LessonPage = lazy(() => import('./pages/LessonPage'));
@@ -35,7 +35,7 @@ export function App() {
   if (!data.profile.onboarded) {
     return (
       <Suspense fallback={fallback}>
-        <Onboarding />
+        <Welcome />
       </Suspense>
     );
   }

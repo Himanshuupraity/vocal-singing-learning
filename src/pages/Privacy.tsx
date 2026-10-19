@@ -11,7 +11,7 @@ export default function Privacy() {
           <ul className={`${section} mt-2 list-disc pl-5`}>
             <li>No ads, no tracking cookies, no analytics profiles.</li>
             <li>Your microphone audio is analysed live inside your browser and is never uploaded.</li>
-            <li>Your progress is stored in your browser unless you choose to create an account for sync.</li>
+            <li>Your progress is stored in your browser unless you choose to save it under your name for use on other devices.</li>
             <li>You can export or delete your data at any time from Settings.</li>
           </ul>
         </Card>
@@ -25,7 +25,7 @@ export default function Privacy() {
         <Card>
           <h2 className="font-semibold">Data sent to the SurSadhana server</h2>
           <div className={section}>
-            <p><strong>Account sync (optional).</strong> If you create an account, your email address, a securely hashed password (scrypt — the password itself is never stored) and a copy of your learning data (not recordings) are stored on this server so you can use SurSadhana on other devices. Deleting your account permanently deletes this copy.</p>
+            <p><strong>Saving under your name (optional).</strong> If you save your progress under a name, the name, a securely hashed 4-digit PIN (scrypt — the PIN itself is never stored) and a copy of your learning data (not recordings) are stored on this server so you can open it on other devices. <strong>Saved names are shown to anyone who opens this website</strong>; your progress can only be opened with the PIN, and five wrong PINs lock the name for 15 minutes. Removing your name permanently deletes this copy.</p>
             <p><strong>Error reports.</strong> If the app crashes, a short technical report (error message, page path, browser type) may be sent so problems can be fixed. It contains no lesson data, recordings or account details. You can turn this off in Settings.</p>
             <p><strong>Song search.</strong> Song titles you search for are passed to Apple&apos;s iTunes Search API to find song credits.</p>
           </div>
@@ -43,7 +43,7 @@ export default function Privacy() {
           <ul className={`${section} mt-2 list-disc pl-5`}>
             <li>Export, import or reset all learning data — Settings → Your data.</li>
             <li>Delete recordings or withdraw recording consent — Settings.</li>
-            <li>Delete your sync account and its server copy — Settings → Account &amp; sync.</li>
+            <li>Remove your name and its server copy — Settings → Your name &amp; sync.</li>
             <li>Turn off error reports — Settings.</li>
           </ul>
           <p className="mt-3 text-xs text-muted">SurSadhana is an educational tool and does not give medical advice. If you have persistent voice problems, please see a doctor or ENT specialist.</p>

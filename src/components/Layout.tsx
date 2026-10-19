@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Alert, Icon, cx, type IconName } from './ui';
 import { useAppData } from '../state/AppData';
 import { tonicLabel } from '../music/theory';
@@ -57,6 +57,58 @@ function NavItems({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+/** Who is learning on this device, and the way to hand it to someone else. */
+function LearnerBox({ onNavigate }: { onNavigate?: () => void }) {
+  const { data } = useAppData();
+  const sync = useSync();
+  const navigate = useNavigate();
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const switchLearner = async () => {
+    setErr(null);
+    setBusy(true);
+    const r = await sync.switchLearner();
+    setBusy(false);
+    if (r.ok) navigate('/', { replace: true });
+    else {
+      setErr(r.message);
+      navigate('/settings');
+      onNavigate?.();
+    }
+  };
+
+  return (
+    <div className="rounded-xl bg-surface-2 p-3 text-xs text-muted">
+      {sync.name ? (
+        <>
+          <p className="text-sm text-text">
+            Namaste, <span className="font-semibold">{sync.name}</span>
+          </p>
+          <p className="mt-0.5">Progress saved to your name.</p>
+          <button type="button" className="mt-1 underline" onClick={switchLearner} disabled={busy}>
+            {busy ? 'Saving…' : 'Switch learner'}
+          </button>
+          {err && <p className="mt-1 text-danger">{err}</p>}
+        </>
+      ) : (
+        <>
+          <p>Progress is saved in this browser only.</p>
+          <NavLink to="/settings#account" className="mt-1 inline-block font-medium text-primary underline" onClick={onNavigate}>
+            Save under your name
+          </NavLink>
+        </>
+      )}
+      <p className="mt-2">
+        Your Sa: <span className="font-semibold text-text">{tonicLabel(data.profile.tonic)}</span> ·{' '}
+        <NavLink to="/privacy" className="underline" onClick={onNavigate}>
+          Privacy
+        </NavLink>
+      </p>
+    </div>
+  );
+}
+
 export function Layout({ children }: { children: ReactNode }) {
   const { data, loadWarning, saveError, dismissWarning } = useAppData();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -81,15 +133,7 @@ export function Layout({ children }: { children: ReactNode }) {
         <nav aria-label="Main" className="mt-8 flex-1 overflow-y-auto">
           <NavItems />
         </nav>
-        <div className="rounded-xl bg-surface-2 p-3 text-xs text-muted">
-          Your Sa: <span className="font-semibold text-text">{tonicLabel(data.profile.tonic)}</span>
-          <br />
-          {sync.email ? <>Synced to {sync.email}</> : 'Progress is saved in this browser.'}
-          <br />
-          <NavLink to="/privacy" className="underline">
-            Privacy
-          </NavLink>
-        </div>
+        <LearnerBox />
       </aside>
 
       {/* Mobile top bar */}
@@ -111,6 +155,9 @@ export function Layout({ children }: { children: ReactNode }) {
             <nav aria-label="Main mobile">
               <NavItems onNavigate={() => setMenuOpen(false)} />
             </nav>
+            <div className="mt-4">
+              <LearnerBox onNavigate={() => setMenuOpen(false)} />
+            </div>
           </div>
         </div>
       )}

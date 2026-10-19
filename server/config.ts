@@ -12,6 +12,8 @@ export interface ServerConfig {
   /** Which AI powers the tutor: Claude when its key is set, else Gemini, else none. */
   tutorProvider: TutorProvider | null;
   youtubeKey: string | null;
+  /** Postgres for learner profiles; without it they live in a local SQLite file. */
+  databaseUrl: string | null;
   port: number;
   tutorRateLimit: number;
 }
@@ -26,6 +28,7 @@ export function loadConfig(env = process.env): ServerConfig {
     geminiModel: env.GEMINI_MODEL?.trim() || 'gemini-flash-latest',
     tutorProvider: anthropicKey ? 'claude' : geminiKey ? 'gemini' : null,
     youtubeKey: placeholder(env.YOUTUBE_API_KEY) ? null : env.YOUTUBE_API_KEY!,
+    databaseUrl: env.DATABASE_URL?.trim() || env.POSTGRES_URL?.trim() || null,
     port: Number(env.PORT) || 8787,
     tutorRateLimit: Number(env.TUTOR_RATE_LIMIT) || 40,
   };

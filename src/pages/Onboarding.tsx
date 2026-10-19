@@ -28,11 +28,11 @@ function Choice<T extends string | number | boolean | null>({ value, current, on
   );
 }
 
-export default function Onboarding() {
+export default function Onboarding({ initialName = '' }: { initialName?: string }) {
   const { update } = useAppData();
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
-  const [a, setA] = useState<Answers>({ name: '', experience: 'none', language: 'hinglish', dailyMinutes: 20, favoriteSongs: '', favoriteSingers: '', focus: 'both', hasMic: null, hasHeadphones: null, tonicChoice: 'help' });
+  const [a, setA] = useState<Answers>({ name: initialName, experience: 'none', language: 'hinglish', dailyMinutes: 20, favoriteSongs: '', favoriteSingers: '', focus: 'both', hasMic: null, hasHeadphones: null, tonicChoice: 'help' });
   const set = <K extends keyof Answers>(k: K, v: Answers[K]) => setA((x) => ({ ...x, [k]: v }));
 
   const finish = (toBaseline: boolean) => {

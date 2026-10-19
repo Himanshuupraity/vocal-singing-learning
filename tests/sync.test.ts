@@ -71,7 +71,7 @@ describe('sync', () => {
 
   it('meta stores no secrets', async () => {
     await syncNow(learner('A'));
-    saveMeta({ ...loadMeta(), email: 'a@b.c' });
+    saveMeta({ ...loadMeta(), name: 'Asha' });
     const raw = localStorage.getItem('sursadhana:sync')!;
     expect(raw).not.toMatch(/password|token|session/i);
     expect(dataHash(learner('A'))).toBe(dataHash(learner('A')));

@@ -4,6 +4,8 @@ import { collectErrors, seedLearner } from './helpers';
 test('first visit: onboarding → dashboard, progress survives reload', async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto('/');
+  // The welcome screen offers saved learners / a new name; this test uses the device-only path.
+  await page.getByRole('button', { name: /Continue without a name/ }).click();
   await expect(page.getByRole('heading', { name: 'Namaste! Welcome to SurSadhana' })).toBeVisible();
   await page.getByLabel(/What should we call you/).fill('Meera');
   for (let i = 0; i < 7; i++) await page.getByRole('button', { name: 'Continue' }).click();

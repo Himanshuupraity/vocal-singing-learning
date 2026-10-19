@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 import { useAppData } from '../state/AppData';
 import { account, acceptServer, loadMeta, push, saveMeta, syncNow, type SyncOutcome } from '../lib/sync';
-import type { AppData } from '../storage/schema';
+import { defaultData, type AppData } from '../storage/schema';
 
 interface SyncState {
-  email: string | null;
+  /** Name of the learner profile this device is signed in to. */
+  name: string | null;
   checked: boolean;
   busy: boolean;
   last?: SyncOutcome;
   conflict?: Extract<SyncOutcome, { kind: 'conflict' }>;
 }
 
-let state: SyncState = { email: loadMeta().email ?? null, checked: false, busy: false };
+let state: SyncState = { name: loadMeta().name ?? null, checked: false, busy: false };
 const subs = new Set<() => void>();
 const set = (p: Partial<SyncState>) => {
   state = { ...state, ...p };
@@ -28,8 +29,8 @@ export function useSync() {
     (o: SyncOutcome) => {
       if (o.kind === 'pulled' && o.data) replace(o.data);
       if (o.kind === 'logged-out') {
-        saveMeta({ ...loadMeta(), email: undefined });
-        set({ email: null });
+        saveMeta({ ...loadMeta(), name: undefined });
+        set({ name: null });
       }
       set({ last: o, busy: false, conflict: o.kind === 'conflict' ? o : undefined });
       return o;
@@ -38,7 +39,7 @@ export function useSync() {
   );
 
   const run = useCallback(async (d: AppData) => {
-    if (state.busy || !state.email) return;
+    if (state.busy || !state.name) return;
     set({ busy: true });
     return apply(await syncNow(d));
   }, [apply]);
@@ -56,24 +57,39 @@ export function useSync() {
     [apply, data, replace],
   );
 
-  const signedIn = useCallback((email: string) => {
-    saveMeta({ ...loadMeta(), email, version: undefined, hashAtSync: undefined });
-    set({ email, checked: true });
+  const signedIn = useCallback((name: string) => {
+    saveMeta({ ...loadMeta(), name, version: undefined, hashAtSync: undefined });
+    set({ name, checked: true });
   }, []);
 
   const signOut = useCallback(async () => {
     await account.logout().catch(() => {});
     saveMeta({ auto: loadMeta().auto });
-    set({ email: null, conflict: undefined, last: undefined });
+    set({ name: null, conflict: undefined, last: undefined });
   }, []);
 
-  return { ...s, run, resolve, signedIn, signOut };
+  /**
+   * Hands this device to another learner: saves this learner's latest progress
+   * first, and only clears the device when that save went through.
+   */
+  const switchLearner = useCallback(async (): Promise<{ ok: true } | { ok: false; message: string }> => {
+    if (state.name) {
+      const o = await run(data);
+      if (!o || (o.kind !== 'pushed' && o.kind !== 'pulled' && o.kind !== 'up-to-date'))
+        return { ok: false, message: o?.kind === 'conflict' ? 'Progress changed on another device. Choose which copy to keep first.' : o?.kind === 'error' ? o.message : 'Could not save your progress. Try again.' };
+    }
+    await signOut();
+    replace(defaultData());
+    return { ok: true };
+  }, [data, replace, run, signOut]);
+
+  return { ...s, run, resolve, signedIn, signOut, switchLearner };
 }
 
 /** Checks the session once, then syncs automatically (debounced) after changes. */
 export function useAutoSync() {
   const { data } = useAppData();
-  const { run, email } = useSync();
+  const { run, name } = useSync();
   const timer = useRef<number | null>(null);
 
   useEffect(() => {
@@ -82,19 +98,22 @@ export function useAutoSync() {
       .me()
       .then((r) => {
         if (r.status === 200) {
-          if (loadMeta().email !== r.body.email) saveMeta({ ...loadMeta(), email: r.body.email });
-          set({ email: r.body.email, checked: true });
-        } else set({ email: null, checked: true });
+          if (loadMeta().name !== r.body.name) saveMeta({ ...loadMeta(), name: r.body.name });
+          set({ name: r.body.name, checked: true });
+        } else if (r.status === 401) {
+          saveMeta({ ...loadMeta(), name: undefined });
+          set({ name: null, checked: true });
+        } else set({ checked: true });
       })
       .catch(() => set({ checked: true }));
   }, []);
 
   useEffect(() => {
-    if (!email || !loadMeta().auto || state.conflict) return;
+    if (!name || !loadMeta().auto || state.conflict) return;
     if (timer.current) clearTimeout(timer.current);
     timer.current = window.setTimeout(() => void run(data), 6000);
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [data, email, run]);
+  }, [data, name, run]);
 }
