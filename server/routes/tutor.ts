@@ -68,6 +68,17 @@ function sse(res: import('express').Response) {
   return (event: string, data: unknown) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 }
 
+/**
+ * Aborts the upstream call if the browser goes away mid-stream. Listens on the
+ * response: a request's own 'close' also fires once its body has been read,
+ * which would cancel every request that carries a large body.
+ */
+function onClientGone(res: import('express').Response, fn: () => void) {
+  res.on('close', () => {
+    if (!res.writableEnded) fn();
+  });
+}
+
 function friendlyError(e: unknown): { status: number; message: string } {
   if (e instanceof Anthropic.AuthenticationError) return { status: 502, message: 'The server’s Claude API key was rejected. Check ANTHROPIC_API_KEY in .env.' };
   if (e instanceof Anthropic.PermissionDeniedError) return { status: 502, message: 'The Claude API key does not have permission for this model.' };
@@ -97,7 +108,7 @@ async function streamClaude(
   };
   const send = sse(res);
   const abort = new AbortController();
-  req.on('close', () => abort.abort());
+  onClientGone(res, () => abort.abort());
   try {
     const useFallback = FALLBACK_MODELS.has(cfg.claudeModel);
     const stream = client.beta.messages.stream(
@@ -151,7 +162,7 @@ async function streamGemini(
 ) {
   const send = sse(res);
   const abort = new AbortController();
-  req.on('close', () => abort.abort());
+  onClientGone(res, () => abort.abort());
   try {
     const stream = await ai.models.generateContentStream({
       model: cfg.geminiModel,

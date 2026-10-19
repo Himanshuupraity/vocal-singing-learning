@@ -189,6 +189,24 @@ describe('voice feedback', () => {
     expect((await request(app).post('/api/tutor/voice').send(body(wav(2_700_000)))).status).toBe(400);
   });
 
+  it('does not cancel the AI call once the (large) request body has been read', async () => {
+    // Regression: listening on the request's 'close' aborted every call right after the body was parsed.
+    const slow = {
+      models: {
+        generateContentStream: async (p: { config: { abortSignal: AbortSignal } }) => {
+          await new Promise((r) => setTimeout(r, 50));
+          if (p.config.abortSignal.aborted) throw Object.assign(new Error('aborted'), { name: 'AbortError' });
+          return (async function* () {
+            yield { text: 'Still listening.', candidates: [{ finishReason: 'STOP' }] };
+          })();
+        },
+      },
+    };
+    const r = await request(createApp(geminiOnly, { makeGemini: () => slow as never })).post('/api/tutor/voice').send(body(wav(400_000)));
+    expect(r.text).toContain('Still listening.');
+    expect(r.text).toContain('event: done');
+  });
+
   it('sends the clip and the app measurements to Gemini and streams the feedback', async () => {
     const calls: unknown[] = [];
     const both = loadConfig({ ANTHROPIC_API_KEY: 'sk-test', GEMINI_API_KEY: 'gm-test' } as NodeJS.ProcessEnv);
