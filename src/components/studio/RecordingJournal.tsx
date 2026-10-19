@@ -5,6 +5,7 @@ import { useAppData } from '../../state/AppData';
 import { uid } from '../../lib/dates';
 import { Alert, Button, EmptyState, Field, inputClass } from '../ui';
 import { RecordingAnalysisView } from './RecordingAnalysisView';
+import { AiVoiceFeedback } from './AiVoiceFeedback';
 
 function pickMime() {
   const opts = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
@@ -120,7 +121,7 @@ export function RecordingJournal({ defaultExercise = '' }: { defaultExercise?: s
         <Alert tone="info" title="Before you record">
           <ul className="list-disc space-y-1 pl-4">
             <li>Recordings use your microphone only while you press Record.</li>
-            <li>They are saved <strong>only in this browser</strong> (IndexedDB on this device). They are never uploaded, shared or sent to the AI tutor.</li>
+            <li>They are saved <strong>only in this browser</strong> (IndexedDB on this device). They are never uploaded or shared — unless you press <strong>Get AI voice feedback</strong> on one and confirm, which sends that one recording to Google Gemini for listening feedback.</li>
             <li>Clearing your browser data, or using private browsing, can delete them. You can delete any recording at any time, or all of them in Settings.</li>
           </ul>
         </Alert>
@@ -184,6 +185,9 @@ export function RecordingJournal({ defaultExercise = '' }: { defaultExercise?: s
               <audio controls preload="none" src={urlFor(r)} className="mt-2 w-full" />
               <div className="mt-2">
                 <RecordingAnalysisView blob={r.blob} />
+              </div>
+              <div className="mt-2">
+                <AiVoiceFeedback recording={r} />
               </div>
               <label className="mt-2 block text-xs text-muted">
                 Notes

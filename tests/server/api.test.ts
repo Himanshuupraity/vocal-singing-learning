@@ -43,7 +43,7 @@ describe('status', () => {
 
   it('reports the Gemini provider and model', async () => {
     const r = await request(createApp(geminiOnly)).get('/api/status');
-    expect(r.body.tutor).toEqual({ configured: true, provider: 'gemini', model: 'gemini-flash-latest' });
+    expect(r.body.tutor).toEqual({ configured: true, provider: 'gemini', model: 'gemini-flash-latest', voice: true });
     expect(JSON.stringify(r.body)).not.toContain('gm-test');
   });
 });
@@ -144,6 +144,64 @@ describe('tutor', () => {
     const r = await request(app).post('/api/songs/plan').send({ song: { title: 'Tum Hi Ho', artist: 'Arijit Singh' }, learner: { level: 1, tonic: 'C', completedTopics: [] }, language: 'english' });
     expect(r.text).toContain('event: error');
     expect(r.text).toContain('GEMINI_API_KEY');
+  });
+});
+
+describe('voice feedback', () => {
+  const wav = (bytes = 2000) => {
+    const b = Buffer.alloc(44 + bytes);
+    b.write('RIFF', 0, 'latin1');
+    b.writeUInt32LE(36 + bytes, 4);
+    b.write('WAVE', 8, 'latin1');
+    return b.toString('base64');
+  };
+  const body = (audio = wav()) => ({
+    audio,
+    mimeType: 'audio/wav',
+    language: 'hinglish',
+    exercise: 'Sa Re Ga Ma — akar',
+    label: 'Morning riyaz',
+    level: 1,
+    tonic: 'C3',
+    measured: { durationSec: 12.3, voicedSec: 9.8, lowest: 'S', highest: 'P', steadinessCents: 7.5, swaras: [{ label: 'Sa', sec: 3.2, avgCents: -12 }] },
+  });
+  const fake = (calls: unknown[]) => ({
+    models: {
+      generateContentStream: async (p: unknown) => {
+        calls.push(p);
+        return (async function* () {
+          yield { text: 'Aapka Sa steady tha.', candidates: [{ finishReason: 'STOP' }], modelVersion: 'gemini-test' };
+        })();
+      },
+    },
+  });
+
+  it('needs a Gemini key even when Claude runs the chat', async () => {
+    const claudeOnly = loadConfig({ ANTHROPIC_API_KEY: 'sk-test' } as NodeJS.ProcessEnv);
+    const r = await request(createApp(claudeOnly)).post('/api/tutor/voice').send(body());
+    expect(r.status).toBe(503);
+    expect((await request(createApp(claudeOnly)).get('/api/status')).body.tutor.voice).toBe(false);
+  });
+
+  it('rejects audio that is not a WAV file, or too large', async () => {
+    const app = createApp(geminiOnly, { makeGemini: () => fake([]) as never });
+    expect((await request(app).post('/api/tutor/voice').send(body(Buffer.from('not a wav file at all, just text '.repeat(10)).toString('base64')))).status).toBe(400);
+    expect((await request(app).post('/api/tutor/voice').send(body(wav(2_700_000)))).status).toBe(400);
+  });
+
+  it('sends the clip and the app measurements to Gemini and streams the feedback', async () => {
+    const calls: unknown[] = [];
+    const both = loadConfig({ ANTHROPIC_API_KEY: 'sk-test', GEMINI_API_KEY: 'gm-test' } as NodeJS.ProcessEnv);
+    const app = createApp(both, { makeGemini: () => fake(calls) as never, makeClient: () => { throw new Error('Claude must not be used for audio'); } });
+    const r = await request(app).post('/api/tutor/voice').send(body());
+    expect(r.status).toBe(200);
+    expect(r.text).toContain('Aapka Sa steady tha.');
+    expect(r.text).toContain('event: done');
+    const p = calls[0] as { contents: { parts: ({ inlineData?: { mimeType: string; data: string } } & { text?: string })[] }[]; config: { systemInstruction: string } };
+    expect(p.contents[0].parts[0].inlineData).toEqual({ mimeType: 'audio/wav', data: body().audio });
+    expect(p.contents[0].parts[1].text).toMatch(/Sa 3\.2s -12¢/);
+    expect(p.contents[0].parts[1].text).toMatch(/Sa = C3/);
+    expect(p.config.systemInstruction).toMatch(/source of truth for pitch/);
   });
 });
 

@@ -258,7 +258,7 @@ export default function Tutor() {
               </ul>
             )}
             <p className="mt-3 text-xs text-muted">
-              The tutor receives a summary of your level, lessons and measured results — never recordings or raw audio. <Link to="/settings" className="underline">Privacy settings</Link>
+              The tutor chat receives a summary of your level, lessons and measured results — never recordings or raw audio. For listening feedback on your voice, use <strong>Get AI voice feedback</strong> in the Recording Journal. <Link to="/settings" className="underline">Privacy settings</Link>
             </p>
           </Card>
         </div>

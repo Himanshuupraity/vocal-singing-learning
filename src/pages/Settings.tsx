@@ -191,7 +191,7 @@ export default function Settings() {
           <div className="mt-6 space-y-3 border-t border-border pt-4">
             <div>
               <p className="text-sm font-medium">Recordings</p>
-              <p className="text-xs text-muted">Stored in this browser&apos;s IndexedDB; never uploaded. Consent: {data.settings.recordingConsent ? 'given' : 'not given'}.</p>
+              <p className="text-xs text-muted">Stored in this browser&apos;s IndexedDB; uploaded only when you ask for AI voice feedback on one. Consent: {data.settings.recordingConsent ? 'given' : 'not given'}.</p>
               {confirm === 'recordings' ? (
                 <div className="mt-2 flex gap-2">
                   <Button

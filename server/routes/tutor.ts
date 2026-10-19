@@ -1,9 +1,9 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import Anthropic from '@anthropic-ai/sdk';
 import { ApiError as GeminiApiError, FinishReason, GoogleGenAI } from '@google/genai';
 import { z } from 'zod';
 import type { ServerConfig } from '../config';
-import { SONG_PLAN_SYSTEM, TUTOR_SYSTEM } from '../lib/tutorPrompt';
+import { SONG_PLAN_SYSTEM, TUTOR_SYSTEM, VOICE_FEEDBACK_SYSTEM } from '../lib/tutorPrompt';
 
 const MessageSchema = z.object({
   role: z.enum(['user', 'assistant']),
@@ -31,12 +31,33 @@ export const SongPlanRequest = z.object({
 /** Models that accept server-side refusal fallbacks (fallbacks: "default"). */
 const FALLBACK_MODELS = new Set(['claude-opus-5-5', 'claude-opus-5', 'claude-fable-5-1', 'claude-sonnet-5-5']);
 
+/** ~60 s of 16 kHz mono 16-bit WAV is ~1.9 MB, ~2.6 MB as base64. */
+const MAX_AUDIO_B64 = 3_500_000;
+
+export const VoiceFeedbackRequest = z.object({
+  audio: z.string().min(100).max(MAX_AUDIO_B64).regex(/^[A-Za-z0-9+/]+={0,2}$/, 'Audio must be base64.'),
+  mimeType: z.literal('audio/wav'),
+  language: z.enum(['hinglish', 'english', 'hindi']),
+  exercise: z.string().max(200).default(''),
+  label: z.string().max(200).default(''),
+  level: z.number().int().min(1).max(4),
+  tonic: z.string().max(10),
+  measured: z.object({
+    durationSec: z.number().min(0).max(600),
+    voicedSec: z.number().min(0).max(600),
+    lowest: z.string().max(12).nullable(),
+    highest: z.string().max(12).nullable(),
+    steadinessCents: z.number().nullable(),
+    swaras: z.array(z.object({ label: z.string().max(12), sec: z.number(), avgCents: z.number() })).max(12),
+  }),
+});
+
 export type ClientFactory = (apiKey: string) => Anthropic;
 export type GeminiFactory = (apiKey: string) => GoogleGenAI;
 
 type ChatMessage = z.infer<typeof MessageSchema>;
 /** One prompt, written once and sent to whichever provider is configured. */
-interface TutorPrompt { system: string; context?: string; messages: ChatMessage[]; maxTokens: number }
+interface TutorPrompt { system: string; context?: string; messages: ChatMessage[]; maxTokens: number; audio?: { mimeType: string; data: string } }
 
 function sse(res: import('express').Response) {
   res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
@@ -134,7 +155,11 @@ async function streamGemini(
   try {
     const stream = await ai.models.generateContentStream({
       model: cfg.geminiModel,
-      contents: prompt.messages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
+      contents: prompt.messages.map((m, i) => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        // Audio, when sent, rides along with the last learner message.
+        parts: [...(prompt.audio && i === prompt.messages.length - 1 ? [{ inlineData: prompt.audio }] : []), { text: m.content }],
+      })),
       config: {
         systemInstruction: [prompt.system, prompt.context].filter(Boolean).join('\n\n'),
         // Thinking tokens count against this limit on Gemini, so leave headroom.
@@ -200,6 +225,30 @@ export function tutorRouter(
     const { song, learner, language } = parsed.data;
     const prompt = `Song metadata (from the iTunes catalogue or typed by the learner):\n${JSON.stringify(song)}\n\nLearner: SurSadhana level ${learner.level}, current Sa ${learner.tonic}. Completed topics: ${learner.completedTopics.join('; ') || 'none yet'}.\nLanguage: ${language}.\n\nWrite the learning plan.`;
     await run({ system: SONG_PLAN_SYSTEM, messages: [{ role: 'user', content: prompt }], maxTokens: 3000 }, res, req);
+  });
+
+  r.post('/tutor/voice', express.json({ limit: '4mb' }), async (req, res) => {
+    // Only Gemini accepts audio, so this works whenever a Gemini key is set, whichever model runs the chat.
+    if (!cfg.geminiKey) return res.status(503).json({ error: 'not_configured', message: 'AI voice feedback needs GEMINI_API_KEY on the server.' });
+    const parsed = VoiceFeedbackRequest.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'invalid_request', message: parsed.error.issues[0]?.message ?? 'Invalid request' });
+    const v = parsed.data;
+    const head = Buffer.from(v.audio.slice(0, 16), 'base64');
+    if (head.subarray(0, 4).toString('latin1') !== 'RIFF' || head.subarray(8, 12).toString('latin1') !== 'WAVE') return res.status(400).json({ error: 'invalid_request', message: 'The recording must be a WAV file.' });
+    const m = v.measured;
+    const prompt = `Learner: SurSadhana level ${v.level}, Sa = ${v.tonic}. Language: ${v.language}.
+Recording: "${v.label || 'untitled'}"${v.exercise ? `, exercise: ${v.exercise}` : ''}.
+App measurements of this clip: ${m.durationSec.toFixed(1)}s long, ${m.voicedSec.toFixed(1)}s of clear singing; range ${m.lowest ?? '—'} to ${m.highest ?? '—'}; steadiness ${m.steadinessCents === null ? 'not measured' : `${m.steadinessCents} cents typical wobble (lower = steadier)`}.
+Swaras held longest (time, average offset from the exact swara): ${m.swaras.map((s) => `${s.label} ${s.sec.toFixed(1)}s ${s.avgCents > 0 ? '+' : ''}${Math.round(s.avgCents)}¢`).join('; ') || 'none detected'}.
+
+Listen to the recording and give your feedback.`;
+    await streamGemini(
+      (gemini ??= makeGemini(cfg.geminiKey)),
+      cfg,
+      { system: VOICE_FEEDBACK_SYSTEM, messages: [{ role: 'user', content: prompt }], maxTokens: 1500, audio: { mimeType: v.mimeType, data: v.audio } },
+      res,
+      req,
+    );
   });
 
   return r;

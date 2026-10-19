@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 
 export interface ServerStatus {
   reachable: boolean;
-  tutor: { configured: boolean; provider?: 'claude' | 'gemini' | null; model: string | null };
+  tutor: { configured: boolean; provider?: 'claude' | 'gemini' | null; model: string | null; voice?: boolean };
   youtube: { configured: boolean };
   songs: { configured: boolean; provider?: string };
 }

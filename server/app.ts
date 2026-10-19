@@ -17,7 +17,8 @@ export function createApp(cfg: ServerConfig, deps: { makeClient?: ClientFactory;
   app.disable('x-powered-by');
   app.set('trust proxy', 1);
   const smallJson = express.json({ limit: '64kb', type: ['application/json', 'text/plain'] });
-  app.use((req, res, next) => (req.path === '/api/sync' ? next() : smallJson(req, res, next)));
+  // Sync and voice feedback carry larger bodies and parse them on their own routes.
+  app.use((req, res, next) => (req.path === '/api/sync' || req.path === '/api/tutor/voice' ? next() : smallJson(req, res, next)));
   app.use((_, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -36,7 +37,7 @@ export function createApp(cfg: ServerConfig, deps: { makeClient?: ClientFactory;
   app.get('/api/status', (_, res) => {
     res.json({
       ok: true,
-      tutor: { configured: !!cfg.tutorProvider, provider: cfg.tutorProvider, model: tutorModel(cfg) },
+      tutor: { configured: !!cfg.tutorProvider, provider: cfg.tutorProvider, model: tutorModel(cfg), voice: !!cfg.geminiKey },
       youtube: { configured: !!cfg.youtubeKey },
       songs: { configured: true, provider: 'iTunes Search API' },
       accounts: { enabled: true, persistent: store.persistent },

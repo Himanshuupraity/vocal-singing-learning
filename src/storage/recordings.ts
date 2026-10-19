@@ -1,6 +1,7 @@
 /**
  * Recording Journal storage — IndexedDB, in this browser only.
- * Recordings are never uploaded anywhere.
+ * Recordings stay here, except a clip the learner explicitly sends for AI
+ * voice feedback (see components/studio/AiVoiceFeedback).
  */
 export interface RecordingMeta {
   id: string;

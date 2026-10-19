@@ -67,6 +67,9 @@ Keys are read **only** by the Express server from `.env`. They are never sent to
 
 With Claude, the tutor uses `claude-opus-5-5` with streaming, prompt caching for the fixed system prompt, server-side refusal fallbacks, a 90-second timeout, input validation (zod) and a per-IP rate limit (`TUTOR_RATE_LIMIT` requests per 15 minutes, default 40).
 
+### AI voice feedback (Gemini only)
+In the **Recording Journal**, each clip has **Get AI voice feedback**. After the learner confirms (every time), the browser decodes the clip, runs the app's own pitch analysis, converts the first 60 s to 16 kHz mono WAV, and posts both to `POST /api/tutor/voice`. The server forwards them to Gemini, which *listens* for tone, breath, strain and steadiness while treating the app's pitch numbers as the source of truth, and streams the reply back. It needs `GEMINI_API_KEY` (Claude can't take audio input), works even when Claude runs the chat, and SurSadhana never stores the audio.
+
 ### YouTube setup
 1. In Google Cloud Console, enable **YouTube Data API v3** and create an API key (restrict it to that API).
 2. Put it in `.env`: `YOUTUBE_API_KEY=...` and restart.
