@@ -99,3 +99,29 @@ html, body {
 
 input[type='range'] { accent-color: var(--primary); }
 input[type='checkbox'], input[type='radio'] { accent-color: var(--primary); }
+
+/* Tailwind v4 gives buttons the default arrow cursor. Show a pointer on
+   everything clickable, and not-allowed on disabled controls. */
+@layer base {
+  button,
+  [role='button'],
+  [role='tab'],
+  a[href],
+  summary,
+  select,
+  input[type='checkbox'],
+  input[type='radio'],
+  input[type='range'],
+  input[type='file'],
+  input[type='color'],
+  label:has(input[type='checkbox'], input[type='radio']) {
+    cursor: pointer;
+  }
+  :is(button, select, input, [role='button'], [role='tab']):disabled,
+  [aria-disabled='true'] {
+    cursor: not-allowed;
+  }
+  label:has(input:disabled) {
+    cursor: not-allowed;
+  }
+}
