@@ -74,6 +74,9 @@ describe('sync', () => {
     saveMeta({ ...loadMeta(), name: 'Asha' });
     const raw = localStorage.getItem('sursadhana:sync')!;
     expect(raw).not.toMatch(/password|token|session/i);
-    expect(dataHash(learner('A'))).toBe(dataHash(learner('A')));
+    // Same data → same hash (one object, cloned: two learner() calls can straddle a millisecond in their timestamps).
+    const a = learner('A');
+    expect(dataHash(a)).toBe(dataHash(structuredClone(a)));
+    expect(dataHash(a)).not.toBe(dataHash(learner('B')));
   });
 });
