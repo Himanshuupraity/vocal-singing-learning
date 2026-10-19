@@ -21,6 +21,12 @@ export const NAV: { to: string; label: string; icon: IconName }[] = [
 
 const MOBILE_PRIMARY = ['/', '/learn', '/riyaz', '/studio', '/tutor'];
 
+/** Companion apps, opened in a new tab. */
+export const MORE_APPS: { href: string; label: string; icon: IconName }[] = [
+  { href: 'https://strings-and-keys-one.vercel.app/', label: 'Guitar / Piano', icon: 'keyboard' },
+  { href: 'https://speak-better-ai.vercel.app/welcome', label: 'Learn English', icon: 'book' },
+];
+
 function Brand() {
   return (
     <div className="flex items-center gap-2.5">
@@ -54,6 +60,27 @@ function NavItems({ onNavigate }: { onNavigate?: () => void }) {
           </NavLink>
         </li>
       ))}
+      <li className="pt-3">
+        <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">More learning</p>
+        <ul className="space-y-1">
+          {MORE_APPS.map((a) => (
+            <li key={a.href}>
+              <a
+                href={a.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={onNavigate}
+                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted transition-colors hover:bg-surface-2 hover:text-text"
+              >
+                <Icon name={a.icon} />
+                <span className="flex-1">{a.label}</span>
+                <Icon name="external" className="h-3.5 w-3.5" />
+                <span className="sr-only">(opens in a new tab)</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </li>
     </ul>
   );
 }

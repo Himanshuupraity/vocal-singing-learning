@@ -230,3 +230,18 @@ test('guided warm-up runs step by step, and Daily Riyaz starts with it', async (
   await expect(page.getByRole('button', { name: /Start (standard|quick)/ })).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test('sidebar links to the Guitar / Piano and English apps in a new tab', async ({ page }, info) => {
+  await seedLearner(page);
+  await page.goto('/');
+  if (info.project.name === 'mobile-safari') await page.getByRole('button', { name: /menu/i }).click();
+  for (const [name, href] of [
+    ['Guitar / Piano', 'https://strings-and-keys-one.vercel.app/'],
+    ['Learn English', 'https://speak-better-ai.vercel.app/welcome'],
+  ]) {
+    const link = page.getByRole('link', { name: new RegExp(name.replace('/', '\\/')) }).first();
+    await expect(link).toBeVisible();
+    await expect(link).toHaveAttribute('href', href);
+    await expect(link).toHaveAttribute('target', '_blank');
+  }
+});
