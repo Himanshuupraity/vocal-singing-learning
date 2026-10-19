@@ -37,6 +37,7 @@ export type PracticeTool =
   | 'long-note'
   | 'meend'
   | 'raag'
+  | 'warmup'
   | 'none';
 
 export interface QuizQuestion {

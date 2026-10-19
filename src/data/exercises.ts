@@ -25,6 +25,12 @@ const down = [...up].reverse();
 export const EXERCISES: Exercise[] = [
   // ---------- Warm-ups ----------
   {
+    id: 'wu-guided', title: 'Guided warm-up', category: 'warmup', minLevel: 1,
+    objective: 'Wake up breath and voice gently, step by step, with spoken cues and sounds to follow.',
+    instructions: ['Press Start below and follow each step.', 'Everything stays soft and comfortable.', 'Stop if anything feels tight, scratchy or painful.'],
+    tool: 'warmup',
+  },
+  {
     id: 'wu-hum', title: 'Gentle humming', category: 'warmup', minLevel: 1,
     objective: 'Wake up the voice gently without strain.',
     instructions: ['Sit or stand tall, shoulders relaxed.', 'Close your lips lightly, teeth apart, and hum "mmm" on a comfortable, speaking-level note.', 'Feel a light buzz on your lips and nose. Keep it soft.', 'Slide the hum slightly up and down — small, easy movements only.'],

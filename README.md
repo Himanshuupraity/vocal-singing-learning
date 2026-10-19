@@ -88,6 +88,7 @@ Instant above/below-sur cues come from the app's own pitch detector (no AI, no n
 - **Ear Training → Sargam dictation** — hear Sa and a 3–5 note phrase, tap the swaras; five levels up to komal/teevra swaras.
 - **Meend & Gamak** — glide analysis (start/landing accuracy, stopping on in-between notes, reversals, breaks, overshoot) and swing analysis (rate, size, evenness) in `src/music/meend.ts`.
 - **Long Note** — longest comfortable hold, steadiness and in-tune %, with history and personal best.
+- **Guided Warm-up** — Quick (3 min), Standard (5 min), Gentle (after strain) and Cool-down routines (`src/data/warmups.ts`): one step at a time with a timer, a breathing animation, spoken cues (Hindi voice for Hinglish/Hindi learners when the device has one) and guide sounds on the learner's Sa. Daily Riyaz opens with it (Gentle after reported strain).
 - **Daily Riyaz** now uses these tools too: unsteady long notes, low dictation scores or an unfinished alankar tempo steer which exercise fills a block (`src/lib/riyaz.ts`), and the tool opens inside the session.
 - **Weekly report** (Progress page, summary on the Dashboard) — last 7 days vs the 7 before, from saved results only, with wins, one focus, “Copy for WhatsApp”, and an optional AI-written note (`POST /api/tutor/weekly`, Claude or Gemini).
 - **Song → Exercise** — hum a phrase (or pick a voice-only clip); the app segments held notes, guesses the tune's Sa, writes sargam and saves it as a reusable exercise (`patterns` in the progress data). All on-device.

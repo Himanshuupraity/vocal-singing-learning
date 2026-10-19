@@ -84,6 +84,9 @@ export function generateRiyaz(data: AppData, minutes: SessionLength, date = loca
     if (alankar[1].lastPct < 80) adjustments.push(`Alankar Trainer: keep working at ${alankar[1].lastBpm} bpm until a run is 80% in tune (last: ${alankar[1].lastPct}%).`);
   }
 
+  // The guided warm-up covers breath, humming, trills and sirens in one go.
+  prefer.warmup = 'wu-guided';
+
   if (!lesson) delete weights.lesson;
   if (!Object.values(data.songs).some((s) => s.status === 'learning')) delete weights.song;
   else if (data.profile.focus === 'bollywood') weights.song = (weights.song ?? 1) + 1;

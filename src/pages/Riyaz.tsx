@@ -15,6 +15,7 @@ import { AlankarTrainer } from '../components/studio/AlankarTrainer';
 import { LongNote } from '../components/studio/LongNote';
 import { MeendPractice } from '../components/studio/MeendPractice';
 import { RaagPractice } from '../components/studio/RaagPractice';
+import { WarmUp } from '../components/studio/WarmUp';
 import { minutesByDate, streak } from '../lib/progress';
 
 type BlockState = 'pending' | 'done' | 'skipped';
@@ -25,9 +26,14 @@ function fmt(sec: number) {
 }
 
 function BlockTool({ block }: { block: RiyazBlock }) {
+  const { data } = useAppData();
   const ex = block.exercise;
   if (!ex) return null;
   switch (ex.tool) {
+    case 'warmup': {
+      const strained = data.sessions.slice(-3).some((s) => s.comfort === 'discomfort' || s.comfort === 'some-strain');
+      return <WarmUp initialRoutine={strained ? 'gentle' : block.minutes <= 3 ? 'quick' : 'standard'} />;
+    }
     case 'pitch-match':
       return <PitchMatcher targets={ex.targets ?? ['S']} context="riyaz" title="Pitch Matcher" />;
     case 'sargam':
@@ -151,6 +157,12 @@ export default function Riyaz() {
             </div>
           </div>
           {summary.exercisesCompleted.length > 0 && <p className="mt-3 text-sm">✓ {summary.exercisesCompleted.join(' · ')}</p>}
+          <p className="mt-3 text-sm">
+            <Link to="/studio/warmup?routine=cooldown" className="font-medium text-primary underline">
+              Do a 2-minute cool-down
+            </Link>{' '}
+            <span className="text-muted">— gentle slides and sighs to settle the voice.</span>
+          </p>
         </Card>
         {!saved ? (
           <Card>

@@ -16,11 +16,13 @@ import { SongToExercise } from '../components/studio/SongToExercise';
 import { AlankarTrainer } from '../components/studio/AlankarTrainer';
 import { MeendPractice } from '../components/studio/MeendPractice';
 import { LongNote } from '../components/studio/LongNote';
+import { WarmUp } from '../components/studio/WarmUp';
 import { isValidSwaraToken } from '../music/theory';
 import { usePracticeTimer } from '../hooks/usePracticeTimer';
 import { TAAL_IDS, type TaalId } from '../music/taal';
 
 const TOOLS: { id: string; label: string; icon: IconName }[] = [
+  { id: 'warmup', label: 'Warm-up', icon: 'sun' },
   { id: 'pitch', label: 'Pitch Matcher', icon: 'target' },
   { id: 'coach', label: 'Live Coach', icon: 'mic' },
   { id: 'drone', label: 'Tanpura Drone', icon: 'wave' },
@@ -41,7 +43,7 @@ const TOOLS: { id: string; label: string; icon: IconName }[] = [
 
 /** Map lesson/exercise tools to studio tabs. */
 export function studioPath(tool: string, opts: { pattern?: string[]; bpm?: number; targets?: string[]; taal?: TaalId } = {}) {
-  const map: Record<string, string> = { 'pitch-match': 'pitch', sargam: 'sargam', drone: 'drone', metronome: 'taal', taal: 'taal', keyboard: 'keyboard', recorder: 'record', 'ear-training': 'ear', 'alankar-trainer': 'alankar', 'long-note': 'breath', meend: 'meend', raag: 'raag' };
+  const map: Record<string, string> = { 'pitch-match': 'pitch', sargam: 'sargam', drone: 'drone', metronome: 'taal', taal: 'taal', keyboard: 'keyboard', recorder: 'record', 'ear-training': 'ear', 'alankar-trainer': 'alankar', 'long-note': 'breath', meend: 'meend', raag: 'raag', warmup: 'warmup' };
   const sp = new URLSearchParams();
   if (opts.pattern?.length) sp.set('p', opts.pattern.filter((t) => t !== '-').join(','));
   if (opts.bpm) sp.set('bpm', String(opts.bpm));
@@ -83,6 +85,7 @@ export default function Studio() {
           {active === 'alankar' && <AlankarTrainer />}
           {active === 'meend' && <MeendPractice />}
           {active === 'breath' && <LongNote />}
+          {active === 'warmup' && <WarmUp initialRoutine={sp.get('routine') === 'cooldown' ? 'cooldown' : 'standard'} />}
           {active === 'song' && <SongToExercise songId={sp.get('song') ?? undefined} />}
         </div>
       </Card>

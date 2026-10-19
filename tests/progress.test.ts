@@ -18,6 +18,7 @@ describe('riyaz generator', () => {
       expect(plan.blocks.reduce((s, b) => s + b.minutes, 0)).toBe(m);
       expect(plan.blocks.every((b) => b.minutes >= 1)).toBe(true);
       expect(plan.blocks[0].category).toBe('warmup');
+      expect(plan.blocks[0].exercise?.id).toBe('wu-guided');
       expect(plan.blocks.at(-1)!.category).toBe('reflection');
     });
   }
@@ -64,7 +65,7 @@ describe('riyaz generator', () => {
   });
 
   it('every exercise in the library opens a real tool', () => {
-    const tools = new Set(['pitch-match', 'sargam', 'drone', 'metronome', 'taal', 'keyboard', 'recorder', 'ear-training', 'alankar-trainer', 'long-note', 'meend', 'raag', 'none']);
+    const tools = new Set(['pitch-match', 'sargam', 'drone', 'metronome', 'taal', 'keyboard', 'recorder', 'ear-training', 'alankar-trainer', 'long-note', 'meend', 'raag', 'warmup', 'none']);
     for (const e of EXERCISES) expect(tools.has(e.tool), e.id).toBe(true);
   });
 });

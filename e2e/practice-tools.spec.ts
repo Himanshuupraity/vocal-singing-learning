@@ -208,3 +208,25 @@ test('daily riyaz picks the Long Note tool after unsteady long notes and opens i
   await expect(page.getByText(/Extra long-note practice/)).toBeVisible();
   await expect(page.getByText('Long note on Sa').first()).toBeVisible();
 });
+
+test('guided warm-up runs step by step, and Daily Riyaz starts with it', async ({ page }) => {
+  const errors = collectErrors(page);
+  await seedLearner(page);
+  await page.goto('/studio/warmup');
+  await page.getByRole('button', { name: /Quick \(3 min\)/ }).click();
+  await page.getByLabel('Speak the instructions').uncheck();
+  await page.getByRole('button', { name: 'Start quick (3 min)' }).click();
+  await expect(page.getByText('Out… sss').or(page.getByText('In', { exact: true }))).toBeVisible();
+  await page.getByRole('button', { name: 'Next step' }).click();
+  await expect(page.getByRole('heading', { name: 'Humming on Sa' })).toBeVisible();
+  await page.waitForTimeout(1500); // tanpura + note pattern playing
+  for (let i = 0; i < 3; i++) await page.getByRole('button', { name: /Next step|Finish/ }).click();
+  await page.getByRole('button', { name: 'Finish' }).click();
+  await expect(page.getByText('Warm-up done — your voice is ready')).toBeVisible();
+
+  await page.goto('/riyaz');
+  await page.getByRole('button', { name: /Start \d+-minute session/ }).click();
+  await expect(page.getByRole('heading', { name: 'Guided warm-up' }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: /Start (standard|quick)/ })).toBeVisible();
+  expect(errors).toEqual([]);
+});
