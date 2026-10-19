@@ -261,7 +261,7 @@ export default function Settings() {
               Server {status === null ? <Badge>checking…</Badge> : status.reachable ? <Badge tone="success">reachable</Badge> : <Badge tone="warning">not reachable</Badge>}
             </li>
             <li className="flex items-center justify-between gap-2">
-              AI Vocal Tutor (Claude) {status?.tutor.configured ? <Badge tone="success">configured</Badge> : <Badge tone="warning">needs ANTHROPIC_API_KEY</Badge>}
+              AI Vocal Tutor{status?.tutor.configured ? <> ({status.tutor.provider === 'gemini' ? 'Gemini' : 'Claude'}) <Badge tone="success">configured</Badge></> : <> <Badge tone="warning">needs ANTHROPIC_API_KEY or GEMINI_API_KEY</Badge></>}
             </li>
             <li className="flex items-center justify-between gap-2">
               YouTube live results {status?.youtube.configured ? <Badge tone="success">configured</Badge> : <Badge tone="warning">needs YOUTUBE_API_KEY</Badge>}

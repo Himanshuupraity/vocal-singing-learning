@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import Anthropic from '@anthropic-ai/sdk';
+import { ApiError as GeminiApiError, FinishReason, GoogleGenAI } from '@google/genai';
 import { z } from 'zod';
 import type { ServerConfig } from '../config';
 import { SONG_PLAN_SYSTEM, TUTOR_SYSTEM } from '../lib/tutorPrompt';
@@ -31,6 +32,11 @@ export const SongPlanRequest = z.object({
 const FALLBACK_MODELS = new Set(['claude-opus-5-5', 'claude-opus-5', 'claude-fable-5-1', 'claude-sonnet-5-5']);
 
 export type ClientFactory = (apiKey: string) => Anthropic;
+export type GeminiFactory = (apiKey: string) => GoogleGenAI;
+
+type ChatMessage = z.infer<typeof MessageSchema>;
+/** One prompt, written once and sent to whichever provider is configured. */
+interface TutorPrompt { system: string; context?: string; messages: ChatMessage[]; maxTokens: number }
 
 function sse(res: import('express').Response) {
   res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
@@ -56,10 +62,18 @@ function friendlyError(e: unknown): { status: number; message: string } {
 async function streamClaude(
   client: Anthropic,
   cfg: ServerConfig,
-  params: { system: Anthropic.Beta.BetaTextBlockParam[]; messages: Anthropic.Beta.BetaMessageParam[]; maxTokens: number },
+  prompt: TutorPrompt,
   res: import('express').Response,
   req: import('express').Request,
 ) {
+  const params = {
+    system: [
+      { type: 'text', text: prompt.system, cache_control: { type: 'ephemeral' } },
+      ...(prompt.context ? [{ type: 'text', text: prompt.context }] : []),
+    ] as Anthropic.Beta.BetaTextBlockParam[],
+    messages: prompt.messages,
+    maxTokens: prompt.maxTokens,
+  };
   const send = sse(res);
   const abort = new AbortController();
   req.on('close', () => abort.abort());
@@ -93,13 +107,82 @@ async function streamClaude(
   }
 }
 
-export function tutorRouter(cfg: ServerConfig, makeClient: ClientFactory = (apiKey) => new Anthropic({ apiKey, maxRetries: 2 })) {
+function friendlyGeminiError(e: unknown): { status: number; message: string } {
+  if (e instanceof GeminiApiError) {
+    if (/api key/i.test(e.message) || e.status === 401 || e.status === 403) return { status: 502, message: 'The server’s Gemini API key was rejected. Check GEMINI_API_KEY in .env.' };
+    if (e.status === 404) return { status: 502, message: 'The configured Gemini model was not found. Check GEMINI_MODEL in .env.' };
+    if (e.status === 429) return { status: 429, message: 'The tutor is busy right now (rate limited). Please wait a minute and try again.' };
+    if (e.status === 400) return { status: 400, message: 'The tutor could not process that request.' };
+    return { status: 502, message: `Gemini API error (${e.status ?? 'unknown'}). Please try again.` };
+  }
+  return { status: 502, message: 'Could not reach the Gemini API, or it took too long. Please try again.' };
+}
+
+/** Finish reasons that mean Gemini withheld the answer rather than finished it. */
+const GEMINI_BLOCKED = new Set<string>([FinishReason.SAFETY, FinishReason.RECITATION, FinishReason.BLOCKLIST, FinishReason.PROHIBITED_CONTENT, FinishReason.SPII]);
+
+async function streamGemini(
+  ai: GoogleGenAI,
+  cfg: ServerConfig,
+  prompt: TutorPrompt,
+  res: import('express').Response,
+  req: import('express').Request,
+) {
+  const send = sse(res);
+  const abort = new AbortController();
+  req.on('close', () => abort.abort());
+  try {
+    const stream = await ai.models.generateContentStream({
+      model: cfg.geminiModel,
+      contents: prompt.messages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
+      config: {
+        systemInstruction: [prompt.system, prompt.context].filter(Boolean).join('\n\n'),
+        // Thinking tokens count against this limit on Gemini, so leave headroom.
+        maxOutputTokens: prompt.maxTokens * 2,
+        abortSignal: abort.signal,
+        httpOptions: { timeout: 90_000 },
+      },
+    });
+    let finish: string | undefined;
+    let model: string | undefined;
+    let blocked = false;
+    for await (const chunk of stream) {
+      if (chunk.promptFeedback?.blockReason) blocked = true;
+      const text = chunk.text;
+      if (text) send('delta', { text });
+      finish = chunk.candidates?.[0]?.finishReason ?? finish;
+      model = chunk.modelVersion ?? model;
+    }
+    if (blocked || (finish && GEMINI_BLOCKED.has(finish))) {
+      send('error', { message: 'The tutor could not answer that request. Try rephrasing it as a singing question.' });
+    } else {
+      send('done', { stopReason: finish === FinishReason.MAX_TOKENS ? 'max_tokens' : 'end_turn', model: model ?? cfg.geminiModel });
+    }
+  } catch (e) {
+    if (abort.signal.aborted) return;
+    const fe = friendlyGeminiError(e);
+    console.error('[tutor]', (e as Error).message);
+    send('error', { message: fe.message });
+  } finally {
+    res.end();
+  }
+}
+
+export function tutorRouter(
+  cfg: ServerConfig,
+  makeClient: ClientFactory = (apiKey) => new Anthropic({ apiKey, maxRetries: 2 }),
+  makeGemini: GeminiFactory = (apiKey) => new GoogleGenAI({ apiKey, httpOptions: { retryOptions: { attempts: 3 } } }),
+) {
   const r = Router();
   let client: Anthropic | null = null;
-  const getClient = () => (client ??= makeClient(cfg.anthropicKey!));
+  let gemini: GoogleGenAI | null = null;
+  const run = (prompt: TutorPrompt, res: import('express').Response, req: import('express').Request) =>
+    cfg.tutorProvider === 'claude'
+      ? streamClaude((client ??= makeClient(cfg.anthropicKey!)), cfg, prompt, res, req)
+      : streamGemini((gemini ??= makeGemini(cfg.geminiKey!)), cfg, prompt, res, req);
 
   r.post('/tutor', async (req, res) => {
-    if (!cfg.anthropicKey) return res.status(503).json({ error: 'not_configured', message: 'The AI tutor is not configured on the server (ANTHROPIC_API_KEY missing).' });
+    if (!cfg.tutorProvider) return res.status(503).json({ error: 'not_configured', message: 'The AI tutor is not configured on the server (set ANTHROPIC_API_KEY or GEMINI_API_KEY).' });
     const parsed = TutorRequest.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'invalid_request', message: parsed.error.issues[0]?.message ?? 'Invalid request' });
     const { messages, context, language } = parsed.data;
@@ -107,35 +190,16 @@ export function tutorRouter(cfg: ServerConfig, makeClient: ClientFactory = (apiK
     if (!messages.length || messages[messages.length - 1].role !== 'user') return res.status(400).json({ error: 'invalid_request', message: 'The last message must be from the learner.' });
 
     const learnerContext = `LEARNER CONTEXT (measured and saved by the app; values are real data, not guesses)\nPreferred language: ${language}\n${JSON.stringify(context, null, 1)}`;
-    await streamClaude(
-      getClient(),
-      cfg,
-      {
-        system: [
-          { type: 'text', text: TUTOR_SYSTEM, cache_control: { type: 'ephemeral' } },
-          { type: 'text', text: learnerContext },
-        ],
-        messages,
-        maxTokens: 4000,
-      },
-      res,
-      req,
-    );
+    await run({ system: TUTOR_SYSTEM, context: learnerContext, messages, maxTokens: 4000 }, res, req);
   });
 
   r.post('/songs/plan', async (req, res) => {
-    if (!cfg.anthropicKey) return res.status(503).json({ error: 'not_configured', message: 'AI song plans need ANTHROPIC_API_KEY on the server.' });
+    if (!cfg.tutorProvider) return res.status(503).json({ error: 'not_configured', message: 'AI song plans need ANTHROPIC_API_KEY or GEMINI_API_KEY on the server.' });
     const parsed = SongPlanRequest.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'invalid_request', message: parsed.error.issues[0]?.message ?? 'Invalid request' });
     const { song, learner, language } = parsed.data;
     const prompt = `Song metadata (from the iTunes catalogue or typed by the learner):\n${JSON.stringify(song)}\n\nLearner: SurSadhana level ${learner.level}, current Sa ${learner.tonic}. Completed topics: ${learner.completedTopics.join('; ') || 'none yet'}.\nLanguage: ${language}.\n\nWrite the learning plan.`;
-    await streamClaude(
-      getClient(),
-      cfg,
-      { system: [{ type: 'text', text: SONG_PLAN_SYSTEM, cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content: prompt }], maxTokens: 3000 },
-      res,
-      req,
-    );
+    await run({ system: SONG_PLAN_SYSTEM, messages: [{ role: 'user', content: prompt }], maxTokens: 3000 }, res, req);
   });
 
   return r;

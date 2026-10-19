@@ -53,7 +53,7 @@ Everything except live AI answers and live YouTube results:
 
 | Feature | Env var | Without it |
 |---|---|---|
-| AI Vocal Tutor + AI song analysis | `ANTHROPIC_API_KEY` (optional `CLAUDE_MODEL`, default `claude-opus-5-5`) | Clearly labelled **demo mode** with built-in guidance — never fake AI answers. “My throat hurts” safety guidance always works offline. |
+| AI Vocal Tutor + AI song analysis | `ANTHROPIC_API_KEY` (optional `CLAUDE_MODEL`, default `claude-opus-5-5`) **or** `GEMINI_API_KEY` (optional `GEMINI_MODEL`, default `gemini-flash-latest`). Claude is used when both are set. | Clearly labelled **demo mode** with built-in guidance — never fake AI answers. “My throat hurts” safety guidance always works offline. |
 | Live YouTube results (titles, thumbnails, channels, durations, embeds) | `YOUTUBE_API_KEY` (YouTube Data API v3) | “Search on YouTube” links that open real YouTube search results |
 
 Keys are read **only** by the Express server from `.env`. They are never sent to, or stored in, the browser. Check status any time on **Settings → Features & API status**.
@@ -61,9 +61,11 @@ Keys are read **only** by the Express server from `.env`. They are never sent to
 ### AI tutor setup
 1. Create a key at https://console.anthropic.com.
 2. Put it in `.env`: `ANTHROPIC_API_KEY=sk-ant-...`
-3. Restart `npm run dev`. The server log shows `AI tutor: configured`.
+3. Restart `npm run dev`. The server log shows `AI tutor: claude (claude-opus-5-5)`.
 
-The tutor uses `claude-opus-5-5` with streaming, prompt caching for the fixed system prompt, server-side refusal fallbacks, a 90-second timeout, input validation (zod) and a per-IP rate limit (`TUTOR_RATE_LIMIT` requests per 15 minutes, default 40).
+**Using Google Gemini instead:** create a free key at https://aistudio.google.com/apikey, put `GEMINI_API_KEY=...` in `.env` and leave `ANTHROPIC_API_KEY` unset. The log then shows `AI tutor: gemini (gemini-flash-latest)`. Set `GEMINI_MODEL` to pin a specific model.
+
+With Claude, the tutor uses `claude-opus-5-5` with streaming, prompt caching for the fixed system prompt, server-side refusal fallbacks, a 90-second timeout, input validation (zod) and a per-IP rate limit (`TUTOR_RATE_LIMIT` requests per 15 minutes, default 40).
 
 ### YouTube setup
 1. In Google Cloud Console, enable **YouTube Data API v3** and create an API key (restrict it to that API).

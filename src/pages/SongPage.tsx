@@ -193,7 +193,7 @@ export default function SongPage() {
             )
           ) : (
             <Alert tone="info">
-              AI song analysis needs the tutor to be configured (<code>ANTHROPIC_API_KEY</code>). Everything else on this page works without it — follow the step-by-step workflow below.
+              AI song analysis needs the tutor to be configured (<code>ANTHROPIC_API_KEY</code> or <code>GEMINI_API_KEY</code>). Everything else on this page works without it — follow the step-by-step workflow below.
             </Alert>
           )}
         </div>

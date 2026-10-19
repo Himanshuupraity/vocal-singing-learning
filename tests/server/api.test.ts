@@ -4,6 +4,7 @@ import request from 'supertest';
 import { createApp } from '../../server/app';
 import { loadConfig } from '../../server/config';
 import { formatIsoDuration } from '../../server/routes/youtube';
+import { ApiError as GeminiApiError } from '@google/genai';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -12,6 +13,7 @@ process.env.LOG_DIR = path.join(os.tmpdir(), 'sursadhana-test-logs');
 
 const noKeys = loadConfig({ ANTHROPIC_API_KEY: 'your-anthropic-api-key-here', YOUTUBE_API_KEY: '' } as NodeJS.ProcessEnv);
 const withKeys = loadConfig({ ANTHROPIC_API_KEY: 'sk-test', YOUTUBE_API_KEY: 'yt-test' } as NodeJS.ProcessEnv);
+const geminiOnly = loadConfig({ GEMINI_API_KEY: 'gm-test' } as NodeJS.ProcessEnv);
 
 const jsonRes = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
@@ -20,6 +22,14 @@ describe('config', () => {
     expect(noKeys.anthropicKey).toBeNull();
     expect(noKeys.youtubeKey).toBeNull();
     expect(noKeys.claudeModel).toBe('claude-opus-5-5');
+    expect(noKeys.tutorProvider).toBeNull();
+  });
+
+  it('picks Claude when both keys are set, else Gemini', () => {
+    expect(loadConfig({ ANTHROPIC_API_KEY: 'sk-test', GEMINI_API_KEY: 'gm-test' } as NodeJS.ProcessEnv).tutorProvider).toBe('claude');
+    expect(geminiOnly.tutorProvider).toBe('gemini');
+    expect(geminiOnly.geminiModel).toBe('gemini-flash-latest');
+    expect(loadConfig({ GEMINI_API_KEY: 'your-gemini-api-key-here' } as NodeJS.ProcessEnv).tutorProvider).toBeNull();
   });
 });
 
@@ -29,6 +39,12 @@ describe('status', () => {
     expect(r.body.tutor.configured).toBe(true);
     expect(JSON.stringify(r.body)).not.toContain('sk-test');
     expect(JSON.stringify(r.body)).not.toContain('yt-test');
+  });
+
+  it('reports the Gemini provider and model', async () => {
+    const r = await request(createApp(geminiOnly)).get('/api/status');
+    expect(r.body.tutor).toEqual({ configured: true, provider: 'gemini', model: 'gemini-flash-latest' });
+    expect(JSON.stringify(r.body)).not.toContain('gm-test');
   });
 });
 
@@ -83,6 +99,51 @@ describe('tutor', () => {
     expect(p.fallbacks).toBe('default');
     expect(p.system[0].text).toMatch(/Vocal health/);
     expect(p.system[1].text).toMatch(/"level": 1/);
+  });
+
+  const fakeGemini = (chunks: unknown[] | Error, calls: unknown[] = []) => ({
+    models: {
+      generateContentStream: async (params: unknown) => {
+        calls.push(params);
+        if (chunks instanceof Error) throw chunks;
+        return (async function* () {
+          yield* chunks;
+        })();
+      },
+    },
+  });
+  const geminiChunk = (text: string, finishReason?: string) => ({ text, candidates: [{ finishReason }], modelVersion: 'gemini-test-001' });
+
+  it('streams Gemini text as SSE with the system prompt and mapped roles', async () => {
+    const calls: unknown[] = [];
+    const app = createApp(geminiOnly, { makeGemini: () => fakeGemini([geminiChunk('Namaste! '), geminiChunk('Sa is your home note.', 'STOP')], calls) as never });
+    const r = await request(app)
+      .post('/api/tutor')
+      .send({ messages: [{ role: 'user', content: 'Hi' }, { role: 'assistant', content: 'Hello' }, { role: 'user', content: 'What is Sa?' }], context: { level: 1 }, language: 'hinglish' });
+    expect(r.status).toBe(200);
+    expect(r.text).toContain('Sa is your home note.');
+    expect(r.text).toContain('event: done');
+    expect(r.text).toContain('gemini-test-001');
+    const p = calls[0] as { model: string; contents: { role: string }[]; config: { systemInstruction: string } };
+    expect(p.model).toBe('gemini-flash-latest');
+    expect(p.contents.map((c) => c.role)).toEqual(['user', 'model', 'user']);
+    expect(p.config.systemInstruction).toMatch(/Vocal health/);
+    expect(p.config.systemInstruction).toMatch(/"level": 1/);
+  });
+
+  it('turns a Gemini safety stop into an error event', async () => {
+    const app = createApp(geminiOnly, { makeGemini: () => fakeGemini([geminiChunk('', 'SAFETY')]) as never });
+    const r = await request(app).post('/api/tutor').send({ messages: [{ role: 'user', content: 'hi' }], context: {}, language: 'english' });
+    expect(r.text).toContain('event: error');
+    expect(r.text).not.toContain('event: done');
+  });
+
+  it('explains a rejected Gemini key', async () => {
+    const err = new GeminiApiError({ message: 'API key not valid. Please pass a valid API key.', status: 400 });
+    const app = createApp(geminiOnly, { makeGemini: () => fakeGemini(err) as never });
+    const r = await request(app).post('/api/songs/plan').send({ song: { title: 'Tum Hi Ho', artist: 'Arijit Singh' }, learner: { level: 1, tonic: 'C', completedTopics: [] }, language: 'english' });
+    expect(r.text).toContain('event: error');
+    expect(r.text).toContain('GEMINI_API_KEY');
   });
 });
 

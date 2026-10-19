@@ -39,7 +39,7 @@ const QUICK: QuickAction[] = [
 
 function demoReply(action: string | null, data: ReturnType<typeof useAppData>['data']): string {
   const head = '**Demo mode — this is not an AI response.** The AI tutor isn’t configured on this server, so here is built-in guidance from the app instead.\n\n';
-  const setup = '\n\n*To enable the real AI tutor, add* `ANTHROPIC_API_KEY` *to the server’s* `.env` *file and restart it (see README → “AI tutor setup”).*';
+  const setup = '\n\n*To enable the real AI tutor, add* `ANTHROPIC_API_KEY` *or* `GEMINI_API_KEY` *to the server’s* `.env` *file and restart it (see README → “AI tutor setup”).*';
   const next = nextRecommendedLesson(data);
   switch (action) {
     case 'today': {
@@ -155,11 +155,11 @@ export default function Tutor() {
         </Alert>
       ) : !configured ? (
         <Alert tone="warning" title="AI tutor not configured — demo mode">
-          Add your Claude API key as <code>ANTHROPIC_API_KEY</code> in the server&apos;s <code>.env</code> file and restart. Until then, replies are clearly labelled built-in guidance, never pretend AI answers.
+          Add a Claude key as <code>ANTHROPIC_API_KEY</code> or a Gemini key as <code>GEMINI_API_KEY</code> in the server&apos;s <code>.env</code> file and restart. Until then, replies are clearly labelled built-in guidance, never pretend AI answers.
         </Alert>
       ) : (
         <p className="mb-2 flex items-center gap-2 text-sm text-muted">
-          <Badge tone="success">Connected</Badge> Powered by Claude ({status.tutor.model}) via the SurSadhana server.
+          <Badge tone="success">Connected</Badge> Powered by {status.tutor.provider === 'gemini' ? 'Gemini' : 'Claude'} ({status.tutor.model}) via the SurSadhana server.
         </p>
       )}
 

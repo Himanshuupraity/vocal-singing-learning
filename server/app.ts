@@ -3,15 +3,15 @@ import rateLimit from 'express-rate-limit';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import type { ServerConfig } from './config';
-import { tutorRouter, type ClientFactory } from './routes/tutor';
+import { tutorModel, type ServerConfig } from './config';
+import { tutorRouter, type ClientFactory, type GeminiFactory } from './routes/tutor';
 import { youtubeRouter } from './routes/youtube';
 import { songsRouter } from './routes/songs';
 import { clientErrorsRouter } from './routes/clientErrors';
 import { accountRouter } from './routes/account';
 import { Store } from './lib/store';
 
-export function createApp(cfg: ServerConfig, deps: { makeClient?: ClientFactory; fetchImpl?: typeof fetch; serveStatic?: boolean; logDir?: string; dataDir?: string } = {}) {
+export function createApp(cfg: ServerConfig, deps: { makeClient?: ClientFactory; makeGemini?: GeminiFactory; fetchImpl?: typeof fetch; serveStatic?: boolean; logDir?: string; dataDir?: string } = {}) {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', 1);
@@ -35,7 +35,7 @@ export function createApp(cfg: ServerConfig, deps: { makeClient?: ClientFactory;
   app.get('/api/status', (_, res) => {
     res.json({
       ok: true,
-      tutor: { configured: !!cfg.anthropicKey, model: cfg.anthropicKey ? cfg.claudeModel : null },
+      tutor: { configured: !!cfg.tutorProvider, provider: cfg.tutorProvider, model: tutorModel(cfg) },
       youtube: { configured: !!cfg.youtubeKey },
       songs: { configured: true, provider: 'iTunes Search API' },
       accounts: { enabled: true },
@@ -46,7 +46,7 @@ export function createApp(cfg: ServerConfig, deps: { makeClient?: ClientFactory;
   app.use('/api/songs/plan', aiLimiter);
   app.use('/api/youtube', searchLimiter);
   app.use('/api/songs/search', searchLimiter);
-  app.use('/api', tutorRouter(cfg, deps.makeClient));
+  app.use('/api', tutorRouter(cfg, deps.makeClient, deps.makeGemini));
   app.use('/api', youtubeRouter(cfg, deps.fetchImpl));
   app.use('/api', songsRouter(deps.fetchImpl));
   app.use('/api/client-errors', rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: 'draft-8', legacyHeaders: false }));
