@@ -41,7 +41,7 @@ const TOOLS: { id: string; label: string; icon: IconName }[] = [
 
 /** Map lesson/exercise tools to studio tabs. */
 export function studioPath(tool: string, opts: { pattern?: string[]; bpm?: number; targets?: string[]; taal?: TaalId } = {}) {
-  const map: Record<string, string> = { 'pitch-match': 'pitch', sargam: 'sargam', drone: 'drone', metronome: 'taal', taal: 'taal', keyboard: 'keyboard', recorder: 'record', 'ear-training': 'ear' };
+  const map: Record<string, string> = { 'pitch-match': 'pitch', sargam: 'sargam', drone: 'drone', metronome: 'taal', taal: 'taal', keyboard: 'keyboard', recorder: 'record', 'ear-training': 'ear', 'alankar-trainer': 'alankar', 'long-note': 'breath', meend: 'meend', raag: 'raag' };
   const sp = new URLSearchParams();
   if (opts.pattern?.length) sp.set('p', opts.pattern.filter((t) => t !== '-').join(','));
   if (opts.bpm) sp.set('bpm', String(opts.bpm));

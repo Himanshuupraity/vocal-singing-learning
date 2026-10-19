@@ -253,6 +253,23 @@ describe('voice feedback', () => {
   });
 });
 
+describe('weekly note', () => {
+  it('needs an AI provider and a valid report', async () => {
+    expect((await request(createApp(noKeys)).post('/api/tutor/weekly').send({ report: {}, level: 1, language: 'english' })).status).toBe(503);
+    const app = createApp(geminiOnly, { makeGemini: () => ({ models: { generateContentStream: async () => (async function* () {})() } }) as never });
+    expect((await request(app).post('/api/tutor/weekly').send({ report: { x: 'y'.repeat(7000) }, level: 1, language: 'english' })).status).toBe(400);
+  });
+
+  it('sends only the measured week and streams the note', async () => {
+    const calls: { contents: { parts: { text: string }[] }[]; config: { systemInstruction: string } }[] = [];
+    const gem = { models: { generateContentStream: async (p: never) => (calls.push(p), (async function* () { yield { text: 'Is hafte badhiya!', candidates: [{ finishReason: 'STOP' }] }; })()) } };
+    const r = await request(createApp(geminiOnly, { makeGemini: () => gem as never })).post('/api/tutor/weekly').send({ report: { minutes: { thisWeek: 100, lastWeek: 30 } }, level: 2, language: 'hinglish' });
+    expect(r.text).toContain('Is hafte badhiya!');
+    expect(calls[0].contents[0].parts.at(-1)!.text).toMatch(/"thisWeek": 100/);
+    expect(calls[0].config.systemInstruction).toMatch(/Use ONLY these numbers/);
+  });
+});
+
 describe('youtube', () => {
   it('returns not_configured without a key', async () => {
     const r = await request(createApp(noKeys)).get('/api/youtube/search?q=sargam');

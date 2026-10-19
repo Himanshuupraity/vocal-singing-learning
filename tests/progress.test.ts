@@ -3,6 +3,7 @@ import { defaultData, SESSION_LENGTHS, type AppData, type PitchAttemptRecord } f
 import { generateRiyaz } from '../src/lib/riyaz';
 import { streak, lessonStatus, canCompleteLesson, isLevelUnlocked, nextRecommendedLesson, lessonContext, insights, pitchTrend } from '../src/lib/progress';
 import { LEVELS } from '../src/curriculum';
+import { EXERCISES } from '../src/data/exercises';
 import { addDays, localDate } from '../src/lib/dates';
 
 const attempt = (over: Partial<PitchAttemptRecord>): PitchAttemptRecord => ({
@@ -34,6 +35,37 @@ describe('riyaz generator', () => {
     const plan = generateRiyaz(d, 30);
     expect(plan.adjustments.join(' ')).toMatch(/strain/);
     expect(plan.blocks.some((b) => b.category === 'technique')).toBe(false);
+  });
+
+  it('uses the Long Note tool when recent long notes were unsteady', () => {
+    const d = defaultData();
+    d.longNotes = [1, 2, 3].map((i) => ({ id: String(i), at: new Date().toISOString(), swara: 'S', sec: 8, steadinessCents: 50, inTunePct: 40 }));
+    const plan = generateRiyaz(d, 30);
+    expect(plan.blocks.find((b) => b.category === 'breath')?.exercise?.id).toBe('br-longnote');
+    expect(plan.adjustments.join(' ')).toMatch(/long-note/);
+  });
+
+  it('adds sargam dictation after low dictation scores', () => {
+    const d = defaultData();
+    d.earTests.push({ id: 'e', at: new Date().toISOString(), context: 'studio', questions: 10, correct: 3, kind: 'dictation' });
+    const plan = generateRiyaz(d, 30);
+    expect(plan.blocks.find((b) => b.category === 'listening')?.exercise?.id).toBe('li-dictation');
+  });
+
+  it('continues the Alankar Trainer at the tempo reached', () => {
+    const d = defaultData();
+    d.lessons = Object.fromEntries(LEVELS[0].lessons.map((l) => [l.id, { completedAt: new Date().toISOString(), quizAttempts: 1, selfChecks: [], practiceCount: 1 }]));
+    d.checkpoints = { 1: { passedAt: new Date().toISOString(), selfChecks: [] } };
+    d.alankars = { 'three:shuddh': { bestBpm: 60, lastBpm: 70, lastPct: 65, at: new Date().toISOString() } };
+    const plan = generateRiyaz(d, 30);
+    expect(plan.level).toBeGreaterThanOrEqual(2);
+    expect(plan.blocks.find((b) => b.category === 'alankar')?.exercise?.id).toBe('al-trainer');
+    expect(plan.adjustments.join(' ')).toMatch(/70 bpm/);
+  });
+
+  it('every exercise in the library opens a real tool', () => {
+    const tools = new Set(['pitch-match', 'sargam', 'drone', 'metronome', 'taal', 'keyboard', 'recorder', 'ear-training', 'alankar-trainer', 'long-note', 'meend', 'raag', 'none']);
+    for (const e of EXERCISES) expect(tools.has(e.tool), e.id).toBe(true);
   });
 });
 

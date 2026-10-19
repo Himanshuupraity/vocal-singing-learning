@@ -4,7 +4,7 @@ import { useAppData } from '../state/AppData';
 import { useSync } from '../hooks/useSync';
 import { account, loadMeta, saveMeta, type ProfileSummary } from '../lib/sync';
 import { Alert, Button, Card, Field, inputClass } from './ui';
-import { ChangePinForm, NewLearnerForm, ProfileButton, UnlockForm } from './LearnerForms';
+import { ChangePinForm, NewLearnerForm, ProfileButton, RecoveryCodeCard, UnlockForm } from './LearnerForms';
 
 /** Saves this device's progress under a learner name + PIN, so any device can open it. */
 export function SyncPanel() {
@@ -173,6 +173,7 @@ export function SyncPanel() {
               {pinChanged && <p className="mt-1 text-sm text-success">PIN changed. Use the new PIN on your other devices.</p>}
             </div>
           )}
+          <RecoverySection />
           {!showDelete ? (
             <button type="button" className="text-xs text-danger underline" onClick={() => setShowDelete(true)}>
               Remove my name and its saved copy
@@ -205,5 +206,61 @@ export function SyncPanel() {
         </div>
       )}
     </Card>
+  );
+}
+
+/** Shows whether this learner has a recovery code, and makes a new one (replacing the old) after the PIN. */
+function RecoverySection() {
+  const [has, setHas] = useState<boolean | null>(null);
+  const [open, setOpen] = useState(false);
+  const [pin, setPin] = useState('');
+  const [err, setErr] = useState<string | null>(null);
+  const [code, setCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    account
+      .me()
+      .then((r) => r.status === 200 && setHas(!!r.body.hasRecovery))
+      .catch(() => setHas(null));
+  }, []);
+
+  if (code) return <RecoveryCodeCard code={code} replaced={!!has} doneLabel="Done" onDone={() => (setCode(null), setHas(true), setOpen(false))} />;
+
+  return (
+    <div className="space-y-2">
+      {has === false && (
+        <Alert tone="warning" title="No recovery code yet">
+          If you forget your PIN, a recovery code is the only way to get back into your progress. Create one now.
+        </Alert>
+      )}
+      {!open ? (
+        <button type="button" className="text-sm font-medium text-primary underline" onClick={() => setOpen(true)}>
+          {has === false ? 'Create a recovery code' : 'Create a new recovery code'}
+        </button>
+      ) : (
+        <form
+          className="flex flex-wrap items-end gap-2 rounded-xl border border-border p-3"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setErr(null);
+            const r = await account.newRecoveryCode(pin).catch(() => ({ status: 0, body: { message: 'Server unreachable.' } as { recoveryCode?: string; message?: string } }));
+            setPin('');
+            if (r.status === 200 && r.body.recoveryCode) setCode(r.body.recoveryCode);
+            else setErr(r.body.message ?? 'Could not create a recovery code.');
+          }}
+        >
+          <Field label="Confirm with your PIN" htmlFor="rc-new-pin" hint={has ? 'Your old recovery code will stop working.' : undefined}>
+            <input id="rc-new-pin" type="password" inputMode="numeric" maxLength={4} autoComplete="off" className={`${inputClass} max-w-[10rem]`} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))} />
+          </Field>
+          <Button type="submit" size="sm" disabled={pin.length !== 4}>
+            Show code
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          {err && <Alert tone="danger">{err}</Alert>}
+        </form>
+      )}
+    </div>
   );
 }

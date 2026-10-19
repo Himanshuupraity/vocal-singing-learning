@@ -36,6 +36,7 @@ fs.writeFileSync(path.join(out, 'config.json'), JSON.stringify({
   routes: [
     { src: '^/api(?:/.*)?$', dest: '/api' },
     { src: '^/assets/(.*)$', headers: { 'cache-control': 'public, max-age=31536000, immutable' }, continue: true },
+    { src: '^/version\\.json$', headers: { 'cache-control': 'no-store' }, continue: true },
     { handle: 'filesystem' },
     { src: '/(.*)', dest: '/index.html' },
   ],

@@ -16,6 +16,8 @@ export interface Profile {
   failed: number;
   lockedUntil: number;
   createdAt: string;
+  /** scrypt hash of the one-time recovery code, if one was created */
+  recoveryHash: string | null;
 }
 export interface ProfileSummary {
   id: string;
@@ -38,8 +40,9 @@ export interface Store {
   recordFailure(id: string, max: number, lockMs: number): Promise<{ failed: number; lockedUntil: number }>;
   clearFailures(id: string): Promise<void>;
   deleteProfile(id: string): Promise<void>;
-  /** Sets a new PIN hash and signs out every other device of this learner. */
+  /** Sets a new PIN hash and signs out every other device of this learner ('' = all devices). */
   changePin(id: string, pinHash: string, keepToken: string): Promise<void>;
+  setRecovery(id: string, recoveryHash: string): Promise<void>;
   createSession(profileId: string, ttlMs: number): Promise<string>;
   sessionProfile(token: string): Promise<string | undefined>;
   deleteSession(token: string): Promise<void>;
@@ -69,6 +72,10 @@ export class SqlStore implements Store {
   ) {
     this.ready = (async () => {
       for (const s of SCHEMA) await q(s);
+      // Added after the first release; older databases get the column here.
+      await q('ALTER TABLE ss_profiles ADD COLUMN recovery_hash TEXT').catch(() => {
+        /* already there */
+      });
     })();
   }
   private async run(sql: string, params: unknown[] = []) {
@@ -93,9 +100,9 @@ export class SqlStore implements Store {
   }
 
   async profileById(id: string) {
-    const [r] = await this.run('SELECT id, name, pin_hash, failed, locked_until, created_at FROM ss_profiles WHERE id = $1', [id]);
+    const [r] = await this.run('SELECT id, name, pin_hash, failed, locked_until, created_at, recovery_hash FROM ss_profiles WHERE id = $1', [id]);
     if (!r) return undefined;
-    return { id: String(r.id), name: String(r.name), pinHash: String(r.pin_hash), failed: Number(r.failed), lockedUntil: Number(r.locked_until), createdAt: String(r.created_at) };
+    return { id: String(r.id), name: String(r.name), pinHash: String(r.pin_hash), failed: Number(r.failed), lockedUntil: Number(r.locked_until), createdAt: String(r.created_at), recoveryHash: r.recovery_hash ? String(r.recovery_hash) : null };
   }
 
   async recordFailure(id: string, max: number, lockMs: number) {
@@ -121,6 +128,10 @@ export class SqlStore implements Store {
   async changePin(id: string, pinHash: string, keepToken: string) {
     await this.run('UPDATE ss_profiles SET pin_hash = $2, failed = 0, locked_until = 0 WHERE id = $1', [id, pinHash]);
     await this.run('DELETE FROM ss_sessions WHERE profile_id = $1 AND token_hash <> $2', [id, hashToken(keepToken)]);
+  }
+
+  async setRecovery(id: string, recoveryHash: string) {
+    await this.run('UPDATE ss_profiles SET recovery_hash = $2 WHERE id = $1', [id, recoveryHash]);
   }
 
   async createSession(profileId: string, ttlMs: number) {
@@ -186,6 +197,18 @@ export function openStore(opts: { databaseUrl?: string | null; dataDir: string }
   }
   return new SqlStore(sqliteQuery(opts.dataDir), opts.dataDir !== ':memory:' && !opts.dataDir.startsWith('/tmp'));
 }
+
+/** Letters and digits that can't be confused when written down (no 0/O, 1/I/L). */
+const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+/** A 15-character recovery code shown as XXXXX-XXXXX-XXXXX (~74 bits). */
+export function newRecoveryCode(): string {
+  const raw = Array.from({ length: 15 }, () => CODE_CHARS[crypto.randomInt(CODE_CHARS.length)]).join('');
+  return `${raw.slice(0, 5)}-${raw.slice(5, 10)}-${raw.slice(10)}`;
+}
+
+/** Uppercases and drops spaces/dashes, so a code typed any way matches. */
+export const normalizeRecoveryCode = (c: string) => c.toUpperCase().replace(/[^A-Z0-9]/g, '');
 
 export const hashToken = (t: string) => crypto.createHash('sha256').update(t).digest('hex');
 

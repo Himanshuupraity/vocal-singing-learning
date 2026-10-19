@@ -11,6 +11,10 @@ import { SargamPlayer } from '../components/studio/SargamPlayer';
 import { MetronomeTool } from '../components/studio/MetronomeTool';
 import { EarTraining } from '../components/studio/EarTraining';
 import { DroneTool } from '../components/studio/DroneTool';
+import { AlankarTrainer } from '../components/studio/AlankarTrainer';
+import { LongNote } from '../components/studio/LongNote';
+import { MeendPractice } from '../components/studio/MeendPractice';
+import { RaagPractice } from '../components/studio/RaagPractice';
 import { minutesByDate, streak } from '../lib/progress';
 
 type BlockState = 'pending' | 'done' | 'skipped';
@@ -32,7 +36,15 @@ function BlockTool({ block }: { block: RiyazBlock }) {
     case 'metronome':
       return <MetronomeTool initialTaal={ex.id === 'rh-dadra' ? 'dadra' : ex.id === 'rh-teentaal' ? 'teentaal' : ex.id.startsWith('rh-') && ex.id !== 'rh-tap' ? 'keharwa' : null} initialBpm={ex.bpm ?? 70} context="riyaz" />;
     case 'ear-training':
-      return <EarTraining context="riyaz" initialKind={ex.id === 'li-higher-lower' ? 'higher-lower' : 'same-different'} />;
+      return <EarTraining context="riyaz" initialKind={ex.id === 'li-higher-lower' ? 'higher-lower' : ex.id === 'li-dictation' ? 'dictation' : 'same-different'} />;
+    case 'alankar-trainer':
+      return <AlankarTrainer />;
+    case 'long-note':
+      return <LongNote />;
+    case 'meend':
+      return <MeendPractice initialMode={ex.id === 'tq-gamak' ? 'gamak' : 'meend'} />;
+    case 'raag':
+      return <RaagPractice initialMode="free" />;
     case 'drone':
       return <DroneTool />;
     case 'recorder':

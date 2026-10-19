@@ -236,6 +236,8 @@ export interface AppData {
   patterns: MyPattern[];
   alankars: Record<string, AlankarProgress>;
   longNotes: LongNoteRecord[];
+  /** AI-written weekly summaries (latest last) */
+  weeklyNotes: { from: string; to: string; text: string; at: string }[];
 }
 
 export function defaultData(now = new Date()): AppData {
@@ -272,8 +274,9 @@ export function defaultData(now = new Date()): AppData {
     patterns: [],
     alankars: {},
     longNotes: [],
+    weeklyNotes: [],
   };
 }
 
 /** Caps to keep localStorage well under browser quotas (~5MB). */
-export const LIMITS = { pitchAttempts: 3000, earTests: 500, rhythm: 500, sessions: 2000, tutorMessages: 60, tutorMemory: 30, patterns: 100, longNotes: 500 };
+export const LIMITS = { pitchAttempts: 3000, earTests: 500, rhythm: 500, sessions: 2000, tutorMessages: 60, tutorMemory: 30, patterns: 100, longNotes: 500, weeklyNotes: 12 };

@@ -67,6 +67,13 @@ export const EXERCISES: Exercise[] = [
     instructions: ['Pick a 4-beat phrase from the Sargam Player (e.g. S R G m P).', 'Take a relaxed breath before it, sing the phrase at a medium volume.', 'Notice whether you run out of air or have too much left — adjust the next breath.', 'Mark your breath points with a "/" in your practice notes.'],
     tool: 'sargam', pattern: ['S', 'R', 'G', 'm', 'P', '-', 'P', 'm', 'G', 'R', 'S', '-'], bpm: 60,
   },
+  {
+    id: 'br-longnote', title: 'Long note on Sa', category: 'breath', minLevel: 1,
+    objective: 'Hold Sa steadily and in tune for as long as it stays comfortable.',
+    instructions: ['Tanpura on. Take a calm, low breath.', 'Sing Sa on "aa" softly and hold it; the app times the hold and checks steadiness.', 'Do 3 holds with a rest between. Stop before you run out of air.'],
+    tool: 'long-note',
+    safety: 'Never squeeze out the last bit of air or push from the throat.',
+  },
   // ---------- Listening ----------
   {
     id: 'li-same-diff', title: 'Same or different?', category: 'listening', minLevel: 1,
@@ -78,6 +85,12 @@ export const EXERCISES: Exercise[] = [
     id: 'li-higher-lower', title: 'Higher or lower?', category: 'listening', minLevel: 1,
     objective: 'Hear the direction of pitch movement.',
     instructions: ['Open Ear Training → "Higher or lower?".', 'Decide whether the second note is higher or lower than the first.', 'Do 10 questions; the gap gets smaller as you improve.'],
+    tool: 'ear-training',
+  },
+  {
+    id: 'li-dictation', title: 'Sargam dictation', category: 'listening', minLevel: 1,
+    objective: 'Recognise short phrases by ear and name their swaras.',
+    instructions: ['Listen to Sa, then the phrase.', 'Tap the swaras you heard, in order.', 'After each answer, play it back and sing it once.'],
     tool: 'ear-training',
   },
   // ---------- Sa ----------
@@ -125,6 +138,12 @@ export const EXERCISES: Exercise[] = [
     instructions: ['Sargam Player at 60 bpm. Listen once.', 'Sing along: S R G, R G m, G m P …', 'Increase to 70–80 bpm only when every note is clear and in tune.'],
     tool: 'sargam', bpm: 60,
     pattern: ['S', 'R', 'G', 'R', 'G', 'm', 'G', 'm', 'P', 'm', 'P', 'D', 'P', 'D', 'N', 'D', 'N', "S'", "S'", 'N', 'D', 'N', 'D', 'P', 'D', 'P', 'm', 'P', 'm', 'G', 'm', 'G', 'R', 'G', 'R', 'S'],
+  },
+  {
+    id: 'al-trainer', title: 'Alankar Trainer', category: 'alankar', minLevel: 2,
+    objective: 'Sing an alankar on the beat with every note checked, raising the tempo only after clean runs.',
+    instructions: ['Pick an alankar (start with groups of three).', 'Listen once, then sing it on the beat.', 'Move up 10 bpm only after a clean run (80% or more in tune).'],
+    tool: 'alankar-trainer',
   },
   {
     id: 'al-4', title: 'Alankar: groups of four', category: 'alankar', minLevel: 2,
@@ -194,8 +213,20 @@ export const EXERCISES: Exercise[] = [
   {
     id: 'tq-meend', title: 'Meend glides', category: 'technique', minLevel: 3,
     objective: 'Connect two notes with a smooth, controlled glide.',
-    instructions: ['Drone on.', 'Glide slowly from Sa up to Ga on "aa", arriving exactly on Ga; hold it.', 'Glide back down to Sa. Then try Pa → Ga and Ni → Sa\'.', 'Keep the glide even — no bumps.'],
-    tool: 'drone',
+    instructions: ['Listen to the glide first.', 'Hold the first note, glide slowly on "aa" and land exactly on the second; hold it.', 'Read the graph: no stopping on the notes in between, no overshoot.', 'Try Sa → Ga, then Sa → Pa and Pa → Sa.'],
+    tool: 'meend',
+  },
+  {
+    id: 'tq-gamak', title: 'Andolan swings', category: 'technique', minLevel: 3,
+    objective: 'Swing evenly between two neighbouring swaras with control.',
+    instructions: ['Start with the slow sway (andolan) between Re and Ga.', 'Touch both notes each time; keep the swings even.', 'Only try the faster gamak when the slow one is even.'],
+    tool: 'meend',
+  },
+  {
+    id: 'rg-check', title: 'Raag free singing check', category: 'raga', minLevel: 3,
+    objective: 'Sing slow alap phrases in a raag without using its varjit swaras.',
+    instructions: ['Pick the raag you are learning and play the tanpura.', 'Sing slow phrases on "aa" or sargam.', 'Watch for red notes (not in the raag) and correct them.'],
+    tool: 'raag',
   },
   {
     id: 'tq-alap', title: 'Simple alap over the drone', category: 'technique', minLevel: 3,

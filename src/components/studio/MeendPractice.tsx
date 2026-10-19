@@ -29,8 +29,8 @@ const SWINGS: [SwaraToken, SwaraToken][] = [
 ];
 const SPEEDS = { andolan: { label: 'Slow sway (andolan)', hz: 1 }, gamak: { label: 'Faster shake (gamak)', hz: 3 } };
 
-export function MeendPractice() {
-  const [mode, setMode] = useState<'meend' | 'gamak'>('meend');
+export function MeendPractice({ initialMode = 'meend' }: { initialMode?: 'meend' | 'gamak' }) {
+  const [mode, setMode] = useState<'meend' | 'gamak'>(initialMode);
   return (
     <div className="space-y-5">
       <div>

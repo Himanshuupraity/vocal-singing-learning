@@ -7,6 +7,7 @@ import { Alert, Badge, Button, Card, LinkButton, PageHeader, ProgressBar, Stat, 
 import { PracticeCalendar, PracticeBars, TrendLine } from '../components/charts';
 import { midiToNoteName, swaraLabel } from '../music/theory';
 import { Link } from 'react-router-dom';
+import { WeeklyReportCard } from '../components/WeeklyReport';
 
 const QUESTIONS: { id: string; text: string }[] = [
   { id: 'match-sa', text: 'I can identify and match Sa more consistently.' },
@@ -122,6 +123,9 @@ export default function Progress() {
         <Stat label="Course" value={`${stats.pct}%`} sub={`${stats.done}/${stats.total} lessons`} icon="book" />
         <Stat label="Streak" value={st.current} sub={`Best ${st.best} days`} icon="flame" />
         <Stat label="Total practice" value={formatMinutes(totalMinutes(data))} sub={`${data.sessions.length} sessions`} icon="calendar" />
+      </div>
+      <div className="mt-6">
+        <WeeklyReportCard />
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">

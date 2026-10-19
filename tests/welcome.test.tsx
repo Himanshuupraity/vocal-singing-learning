@@ -82,6 +82,25 @@ describe('Who’s practising? (new device)', () => {
     expect(calls).not.toContain('PUT /api/sync');
   });
 
+  it('shows the recovery code once before continuing', async () => {
+    serve([]);
+    const base = globalThis.fetch;
+    globalThis.fetch = (async (url: string, init?: RequestInit) =>
+      url === '/api/profiles' && init?.method === 'POST' ? json(201, { id: 'p2', name: 'Asha', recoveryCode: 'ABCDE-FGHJK-MNPQR' }) : base(url, init)) as never;
+    await renderApp();
+    await screen.findByText('Namaste! Welcome to SurSadhana');
+    await userEvent.type(screen.getByLabelText('Your name'), 'Asha');
+    await userEvent.type(screen.getByLabelText('Choose a 4-digit PIN'), '1357');
+    await userEvent.type(screen.getByLabelText('Type the PIN again'), '1357');
+    await userEvent.click(screen.getByRole('button', { name: 'Save my progress' }));
+    expect(await screen.findByText('ABCDE-FGHJK-MNPQR')).toBeInTheDocument();
+    const go = screen.getByRole('button', { name: /I’ve saved it/ });
+    expect(go).toBeDisabled();
+    await userEvent.click(screen.getByLabelText('I’ve saved my recovery code'));
+    await userEvent.click(go);
+    expect(await screen.findByLabelText(/What should we call you/)).toHaveValue('Asha');
+  });
+
   it('falls back to plain onboarding when the server is unreachable', async () => {
     globalThis.fetch = (async () => {
       throw new TypeError('offline');

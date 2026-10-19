@@ -8,6 +8,7 @@ import { generateRiyaz } from '../lib/riyaz';
 import { formatMinutes, localDate } from '../lib/dates';
 import { PracticeBars, TrendLine } from '../components/charts';
 import { tonicLabel } from '../music/theory';
+import { WeekAtAGlance } from '../components/WeeklyReport';
 
 function greeting(name: string, lang: string) {
   const h = new Date().getHours();
@@ -46,6 +47,8 @@ export default function Dashboard() {
           )}
         </p>
       </header>
+
+      <WeekAtAGlance />
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">

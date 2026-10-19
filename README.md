@@ -70,6 +70,12 @@ With Claude, the tutor uses `claude-opus-5-5` with streaming, prompt caching for
 ### AI voice feedback (Gemini only)
 In the **Recording Journal**, each clip has **Get AI voice feedback**. After the learner confirms (every time), the browser decodes the clip, runs the app's own pitch analysis, converts the first 60 s to 16 kHz mono WAV, and posts both to `POST /api/tutor/voice`. The server forwards them to Gemini, which *listens* for tone, breath, strain and steadiness while treating the app's pitch numbers as the source of truth, and streams the reply back. It needs `GEMINI_API_KEY` (Claude can't take audio input), works even when Claude runs the chat, and SurSadhana never stores the audio.
 
+### Learner names: recovery code
+Saving a name returns a one-time recovery code (only its scrypt hash is stored). “Forgot PIN?” on the PIN screen uses it to set a new PIN (`POST /api/profiles/:id/recover`), which signs out every device and issues a new code. Signed-in learners can make a new code in Settings (`POST /api/profiles/me/recovery`, needs the PIN).
+
+### Update banner
+Each build embeds a build id (the Git commit on Vercel) and writes `/version.json` (served `no-store`). The app checks it on load, every 10 minutes and when the tab is shown again, and offers “Refresh” when a newer deploy is live; a page that fails to load because its old file is gone shows the same prompt.
+
 ### Live Coach (Practice Studio)
 Instant above/below-sur cues come from the app's own pitch detector (no AI, no network). The optional **AI coach** (after consent) records the mic in 30 s pieces with `MediaRecorder`, and posts the last 20 s as 16 kHz WAV plus its pitch analysis and the previous tips to `POST /api/tutor/coach`, which asks Gemini for one short tip. Snippets with under 4 s of clear singing are not sent. Needs `GEMINI_API_KEY`.
 
@@ -82,6 +88,8 @@ Instant above/below-sur cues come from the app's own pitch detector (no AI, no n
 - **Ear Training → Sargam dictation** — hear Sa and a 3–5 note phrase, tap the swaras; five levels up to komal/teevra swaras.
 - **Meend & Gamak** — glide analysis (start/landing accuracy, stopping on in-between notes, reversals, breaks, overshoot) and swing analysis (rate, size, evenness) in `src/music/meend.ts`.
 - **Long Note** — longest comfortable hold, steadiness and in-tune %, with history and personal best.
+- **Daily Riyaz** now uses these tools too: unsteady long notes, low dictation scores or an unfinished alankar tempo steer which exercise fills a block (`src/lib/riyaz.ts`), and the tool opens inside the session.
+- **Weekly report** (Progress page, summary on the Dashboard) — last 7 days vs the 7 before, from saved results only, with wins, one focus, “Copy for WhatsApp”, and an optional AI-written note (`POST /api/tutor/weekly`, Claude or Gemini).
 - **Song → Exercise** — hum a phrase (or pick a voice-only clip); the app segments held notes, guesses the tune's Sa, writes sargam and saves it as a reusable exercise (`patterns` in the progress data). All on-device.
 
 ### YouTube setup

@@ -158,3 +158,53 @@ test('long note: times the hold, saves it and shows the best', async ({ page }, 
   await page.reload();
   await expect(page.getByText(/Best: (3|4)\.\ds/)).toBeVisible();
 });
+
+// page.route() can't see requests once a service worker controls the page (WebKit), so these run without it.
+test.describe('with mocked server answers', () => {
+  test.use({ serviceWorkers: 'block' });
+
+  test('a newer deploy shows a refresh banner', async ({ page }) => {
+    await seedLearner(page);
+    await page.goto('/');
+    await expect(page.getByText('A new version of SurSadhana is ready')).toHaveCount(0);
+    const real = await (await page.request.get('/version.json')).json();
+    expect(typeof real.id).toBe('string');
+    await page.route('**/version.json', (r) => r.fulfill({ json: { id: 'newer-build' } }));
+    await page.goto('/progress');
+    await expect(page.getByText('A new version of SurSadhana is ready')).toBeVisible();
+    await page.getByRole('button', { name: 'Later' }).click();
+    await expect(page.getByText('A new version of SurSadhana is ready')).toHaveCount(0);
+  });
+
+  test('weekly report shows the measured week and an AI note', async ({ page }) => {
+    const day = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+    await seedLearner(page, {
+      sessions: [0, 1, 2, 9].map((n, i) => ({ id: String(i), date: day(n), startedAt: '', minutes: 20, kind: 'riyaz', exercisesCompleted: [], exercisesSkipped: [] })),
+      longNotes: [{ id: 'l', at: new Date().toISOString(), swara: 'S', sec: 12.5, steadinessCents: 20, inTunePct: 80 }],
+    });
+    await page.route('**/api/status', (r) => r.fulfill({ json: { ok: true, tutor: { configured: true, provider: 'gemini', model: 'g', voice: true }, youtube: { configured: false }, songs: { configured: true } } }));
+    let sent: { report: { minutes: { thisWeek: number } } } | null = null;
+    await page.route('**/api/tutor/weekly', async (r) => {
+      sent = r.request().postDataJSON();
+      await r.fulfill({ status: 200, headers: { 'content-type': 'text/event-stream' }, body: 'event: delta\ndata: {"text":"## Is hafte\\nTeen din riyaz — shabash!"}\n\nevent: done\ndata: {}\n\n' });
+    });
+    await page.goto('/');
+    await expect(page.getByText(/60 min on 3 days/)).toBeVisible();
+    await page.getByRole('link', { name: 'Weekly report' }).click();
+    await expect(page.getByRole('heading', { name: 'Weekly report' })).toBeVisible();
+    await expect(page.getByText('12.5s')).toBeVisible();
+    await page.getByRole('button', { name: 'Get a weekly note from the AI coach' }).click();
+    await expect(page.getByText('Teen din riyaz — shabash!')).toBeVisible();
+    expect(sent!.report.minutes.thisWeek).toBe(60);
+    await page.reload();
+    await expect(page.getByText('Teen din riyaz — shabash!')).toBeVisible();
+  });
+});
+
+test('daily riyaz picks the Long Note tool after unsteady long notes and opens it in the session', async ({ page }) => {
+  await seedLearner(page, { longNotes: [1, 2, 3].map((i) => ({ id: String(i), at: new Date().toISOString(), swara: 'S', sec: 6, steadinessCents: 60, inTunePct: 30 })) });
+  await page.goto('/riyaz');
+  await page.getByRole('button', { name: '30 min' }).click();
+  await expect(page.getByText(/Extra long-note practice/)).toBeVisible();
+  await expect(page.getByText('Long note on Sa').first()).toBeVisible();
+});

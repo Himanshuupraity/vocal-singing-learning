@@ -60,6 +60,30 @@ export function generateRiyaz(data: AppData, minutes: SessionLength, date = loca
     weights.rhythm = (weights.rhythm ?? 0) + 2;
     adjustments.push('Extra rhythm practice (recent tap-along results under 60% on-beat).');
   }
+  // Results from the newer practice tools steer which exercise fills a block.
+  const prefer: Partial<Record<RiyazBlock['category'], string>> = {};
+  const notes = data.longNotes.slice(-3);
+  if (notes.length) {
+    const inTune = notes.reduce((s, r) => s + r.inTunePct, 0) / notes.length;
+    const spread = notes.reduce((s, r) => s + r.steadinessCents, 0) / notes.length;
+    if (inTune < 60 || spread > 35) {
+      weights.breath = (weights.breath ?? 0) + 2;
+      prefer.breath = 'br-longnote';
+      adjustments.push(`Extra long-note practice: your recent long notes were ${Math.round(inTune)}% in tune with ${Math.round(spread)} cents of wobble.`);
+    }
+  }
+  const dict = data.earTests.filter((t) => t.kind === 'dictation').slice(-2);
+  if (dict.length && dict.reduce((s, t) => s + t.correct / t.questions, 0) / dict.length < 0.6) {
+    weights.listening = (weights.listening ?? 0) + 2;
+    prefer.listening = 'li-dictation';
+    adjustments.push('Extra sargam dictation (recent scores under 60%) — naming notes by ear makes learning songs much easier.');
+  }
+  const alankar = Object.entries(data.alankars).sort((a, b) => b[1].at.localeCompare(a[1].at))[0];
+  if (alankar && level >= 2) {
+    prefer.alankar = 'al-trainer';
+    if (alankar[1].lastPct < 80) adjustments.push(`Alankar Trainer: keep working at ${alankar[1].lastBpm} bpm until a run is 80% in tune (last: ${alankar[1].lastPct}%).`);
+  }
+
   if (!lesson) delete weights.lesson;
   if (!Object.values(data.songs).some((s) => s.status === 'learning')) delete weights.song;
   else if (data.profile.focus === 'bollywood') weights.song = (weights.song ?? 1) + 1;
@@ -105,7 +129,8 @@ export function generateRiyaz(data: AppData, minutes: SessionLength, date = loca
     }
     const pool = EXERCISES.filter((e) => e.category === cat && e.minLevel <= level && (e.maxLevel ?? 4) >= level);
     const preferWeak = cat === 'pitch' && weak.length ? pool.find((e) => e.targets?.some((t) => weak.some((w) => w.target === t))) : undefined;
-    const ex = preferWeak ?? pool[(seed + i) % Math.max(1, pool.length)];
+    const preferred = prefer[cat] ? pool.find((e) => e.id === prefer[cat]) : undefined;
+    const ex = preferred ?? preferWeak ?? pool[(seed + i) % Math.max(1, pool.length)];
     return {
       id: ex?.id ?? `${cat}-${i}`,
       minutes: alloc[i],

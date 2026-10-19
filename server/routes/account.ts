@@ -1,7 +1,7 @@
 import express, { Router, type Request, type Response, type NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
-import { hashPassword, verifyPassword, type Store } from '../lib/store';
+import { hashPassword, newRecoveryCode, normalizeRecoveryCode, verifyPassword, type Store } from '../lib/store';
 
 const COOKIE = 'ss_session';
 const TTL = 180 * 24 * 3600 * 1000;
@@ -56,6 +56,13 @@ export function accountRouter(store: Store) {
     next();
   };
 
+  /** A new recovery code replaces any earlier one; only its hash is stored, so it is shown just once. */
+  const issueRecovery = async (id: string) => {
+    const code = newRecoveryCode();
+    await store.setRecovery(id, await hashPassword(normalizeRecoveryCode(code)));
+    return code;
+  };
+
   r.use('/profiles', csrf);
   r.use('/auth', csrf);
   r.use('/sync', csrf);
@@ -69,8 +76,9 @@ export function accountRouter(store: Store) {
     if (!p.success) return res.status(400).json({ error: 'invalid_request', message: p.error.issues[0]?.message ?? 'Invalid name or PIN.' });
     const id = await store.createProfile(p.data.name, await hashPassword(p.data.pin));
     if (!id) return res.status(409).json({ error: 'exists', message: 'That name is already taken. Pick it from the list, or use a different name.' });
+    const recoveryCode = await issueRecovery(id);
     setSession(req, res, await store.createSession(id, TTL));
-    res.status(201).json({ id, name: p.data.name });
+    res.status(201).json({ id, name: p.data.name, recoveryCode });
   });
 
   r.post('/profiles/:id/unlock', authLimiter, async (req, res) => {
@@ -93,7 +101,7 @@ export function accountRouter(store: Store) {
     const prof = await store.profileById(res.locals.profileId);
     if (!prof) return res.status(401).json({ error: 'unauthenticated' });
     const p = await store.getProgress(prof.id);
-    res.json({ id: prof.id, name: prof.name, sync: p ? { version: p.version, updatedAt: p.updatedAt } : null });
+    res.json({ id: prof.id, name: prof.name, hasRecovery: !!prof.recoveryHash, sync: p ? { version: p.version, updatedAt: p.updatedAt } : null });
   });
 
   r.post('/auth/logout', async (req, res) => {
@@ -118,6 +126,33 @@ export function accountRouter(store: Store) {
     if (p.data.newPin === p.data.currentPin) return res.status(400).json({ error: 'same_pin', message: 'The new PIN is the same as the current one.' });
     await store.changePin(prof.id, await hashPassword(p.data.newPin), res.locals.token);
     res.status(204).end();
+  });
+
+  r.post('/profiles/me/recovery', authLimiter, auth, async (req, res) => {
+    const pin = Pin.safeParse(req.body?.pin);
+    const prof = await store.profileById(res.locals.profileId);
+    if (!prof) return res.status(401).json({ error: 'unauthenticated' });
+    if (prof.lockedUntil > Date.now()) return res.status(423).json({ error: 'locked', message: lockedMessage(prof.lockedUntil) });
+    if (!pin.success || !(await verifyPassword(pin.data, prof.pinHash))) {
+      const f = await store.recordFailure(prof.id, MAX_FAILS, LOCK_MS);
+      if (f.lockedUntil > Date.now()) return res.status(423).json({ error: 'locked', message: lockedMessage(f.lockedUntil) });
+      return res.status(401).json({ error: 'wrong_pin', message: 'PIN is incorrect.' });
+    }
+    res.json({ recoveryCode: await issueRecovery(prof.id) });
+  });
+
+  // Forgot PIN: the recovery code sets a new PIN, signs out every device and is replaced by a new code.
+  r.post('/profiles/:id/recover', authLimiter, async (req, res) => {
+    const p = z.object({ code: z.string().max(40), newPin: Pin }).safeParse(req.body);
+    if (!p.success) return res.status(400).json({ error: 'invalid_request', message: p.error.issues[0]?.message ?? 'Invalid request.' });
+    const prof = await store.profileById(String(req.params.id));
+    if (!prof) return res.status(404).json({ error: 'not_found', message: 'That learner no longer exists.' });
+    if (!prof.recoveryHash) return res.status(400).json({ error: 'no_recovery', message: 'This name has no recovery code, so its PIN can’t be reset. If you still have it open on another device, create a recovery code there in Settings.' });
+    if (!(await verifyPassword(normalizeRecoveryCode(p.data.code), prof.recoveryHash))) return res.status(401).json({ error: 'wrong_code', message: 'That recovery code is not right. Check it and try again.' });
+    await store.changePin(prof.id, await hashPassword(p.data.newPin), '');
+    const recoveryCode = await issueRecovery(prof.id);
+    setSession(req, res, await store.createSession(prof.id, TTL));
+    res.json({ id: prof.id, name: prof.name, recoveryCode });
   });
 
   r.delete('/profiles/me', authLimiter, auth, async (req, res) => {

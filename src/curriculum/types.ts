@@ -33,6 +33,10 @@ export type PracticeTool =
   | 'keyboard'
   | 'recorder'
   | 'ear-training'
+  | 'alankar-trainer'
+  | 'long-note'
+  | 'meend'
+  | 'raag'
   | 'none';
 
 export interface QuizQuestion {

@@ -163,6 +163,45 @@ describe.each(backends)('learner profiles & sync (%s)', (_name, makeStore) => {
     expect((await a.delete('/api/profiles/me').set(H).send({ pin: '5555' })).status).toBe(204);
     expect((await a.get('/api/profiles')).body.profiles).toEqual([]);
   });
+  it('gives a one-time recovery code that resets a forgotten PIN', async () => {
+    const app1 = app();
+    const phone = agent(app1);
+    const laptop = agent(app1);
+    const c = await create(phone, 'Meera', '1111');
+    const code: string = c.body.recoveryCode;
+    expect(code).toMatch(/^[A-HJ-KM-NP-Z2-9]{5}-[A-HJ-KM-NP-Z2-9]{5}-[A-HJ-KM-NP-Z2-9]{5}$/);
+    expect((await phone.get('/api/auth/me')).body.hasRecovery).toBe(true);
+    expect(JSON.stringify((await phone.get('/api/profiles')).body)).not.toContain(code);
+
+    // The laptop forgot the PIN.
+    const id = c.body.id;
+    expect((await laptop.post(`/api/profiles/${id}/recover`).send({ code, newPin: '2222' })).status).toBe(403); // CSRF header required
+    expect((await laptop.post(`/api/profiles/${id}/recover`).set(H).send({ code: 'AAAAA-BBBBB-CCCCC', newPin: '2222' })).status).toBe(401);
+    const ok = await laptop.post(`/api/profiles/${id}/recover`).set(H).send({ code: code.toLowerCase().replace(/-/g, ' '), newPin: '2222' });
+    expect(ok.status).toBe(200);
+    expect(ok.body.name).toBe('Meera');
+    expect(ok.body.recoveryCode).not.toBe(code);
+    expect((await laptop.get('/api/auth/me')).body.name).toBe('Meera');
+    // Every other device is signed out, the old PIN and the used code stop working.
+    expect((await phone.get('/api/auth/me')).status).toBe(401);
+    expect((await agent(app1).post(`/api/profiles/${id}/unlock`).set(H).send({ pin: '1111' })).status).toBe(401);
+    expect((await agent(app1).post(`/api/profiles/${id}/unlock`).set(H).send({ pin: '2222' })).status).toBe(200);
+    expect((await agent(app1).post(`/api/profiles/${id}/recover`).set(H).send({ code, newPin: '3333' })).status).toBe(401);
+  });
+
+  it('creates a fresh recovery code from Settings only with the PIN', async () => {
+    const app1 = app();
+    const a = agent(app1);
+    const c = await create(a, 'Kabir', '4321');
+    expect((await a.post('/api/profiles/me/recovery').set(H).send({ pin: '0000' })).status).toBe(401);
+    const r = await a.post('/api/profiles/me/recovery').set(H).send({ pin: '4321' });
+    expect(r.status).toBe(200);
+    expect(r.body.recoveryCode).not.toBe(c.body.recoveryCode);
+    // The old code is replaced.
+    expect((await agent(app1).post(`/api/profiles/${c.body.id}/recover`).set(H).send({ code: c.body.recoveryCode, newPin: '5555' })).status).toBe(401);
+    expect((await agent(app1).post(`/api/profiles/${c.body.id}/recover`).set(H).send({ code: r.body.recoveryCode, newPin: '5555' })).status).toBe(200);
+  });
+
   // Each Postgres test boots a fresh in-process PGlite (WebAssembly), which takes a few seconds on CI runners.
 }, 30_000);
 

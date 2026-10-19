@@ -20,10 +20,10 @@ const STATUS_STYLE: Record<RagaNoteStatus, string> = {
   out: 'bg-danger-soft text-danger',
 };
 
-export function RaagPractice() {
+export function RaagPractice({ initialMode = 'phrases' }: { initialMode?: 'phrases' | 'free' }) {
   const [ragaId, setRagaId] = useState<RagaId>('yaman');
   const raga = RAGAS.find((r) => r.id === ragaId)!;
-  const [mode, setMode] = useState<'phrases' | 'free'>('phrases');
+  const [mode, setMode] = useState<'phrases' | 'free'>(initialMode);
   const drone = useDrone(raga.firstString);
 
   return (

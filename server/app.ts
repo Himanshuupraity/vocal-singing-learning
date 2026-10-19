@@ -59,7 +59,7 @@ export function createApp(cfg: ServerConfig, deps: { makeClient?: ClientFactory;
   if (deps.serveStatic) {
     const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist');
     if (fs.existsSync(dist)) {
-      app.use(express.static(dist, { index: false, maxAge: '1h' }));
+      app.use(express.static(dist, { index: false, maxAge: '1h', setHeaders: (res, file) => file.endsWith('version.json') && res.setHeader('Cache-Control', 'no-store') }));
       app.get(/^(?!\/api).*/, (_, res) => res.sendFile(path.join(dist, 'index.html')));
     }
   }

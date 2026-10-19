@@ -4,6 +4,7 @@ import { Alert, Icon, cx, type IconName } from './ui';
 import { useAppData } from '../state/AppData';
 import { tonicLabel } from '../music/theory';
 import { useReminder } from '../hooks/useReminder';
+import { useUpdateAvailable } from '../hooks/useUpdateAvailable';
 import { useAutoSync, useSync } from '../hooks/useSync';
 
 export const NAV: { to: string; label: string; icon: IconName }[] = [
@@ -113,6 +114,8 @@ export function Layout({ children }: { children: ReactNode }) {
   const { data, loadWarning, saveError, dismissWarning } = useAppData();
   const [menuOpen, setMenuOpen] = useState(false);
   const reminder = useReminder();
+  const update = useUpdateAvailable();
+  const [updateLater, setUpdateLater] = useState(false);
   useAutoSync();
   const sync = useSync();
   const loc = useLocation();
@@ -170,6 +173,20 @@ export function Layout({ children }: { children: ReactNode }) {
                 {loadWarning}{' '}
                 <button type="button" className="underline" onClick={dismissWarning}>
                   Dismiss
+                </button>
+              </Alert>
+            </div>
+          )}
+          {update && !updateLater && (
+            <div className="mb-4">
+              <Alert tone="info" title="A new version of SurSadhana is ready" icon="sparkle">
+                Refresh to get the latest tools and fixes. Your progress is saved.{' '}
+                <button type="button" className="font-medium underline" onClick={() => window.location.reload()}>
+                  Refresh now
+                </button>{' '}
+                ·{' '}
+                <button type="button" className="underline" onClick={() => setUpdateLater(true)}>
+                  Later
                 </button>
               </Alert>
             </div>

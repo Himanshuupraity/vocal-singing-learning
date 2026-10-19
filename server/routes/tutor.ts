@@ -3,7 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { ApiError as GeminiApiError, FinishReason, GoogleGenAI } from '@google/genai';
 import { z } from 'zod';
 import type { ServerConfig } from '../config';
-import { LIVE_COACH_SYSTEM, SONG_PLAN_SYSTEM, TUTOR_SYSTEM, VOICE_FEEDBACK_SYSTEM } from '../lib/tutorPrompt';
+import { LIVE_COACH_SYSTEM, SONG_PLAN_SYSTEM, TUTOR_SYSTEM, VOICE_FEEDBACK_SYSTEM, WEEKLY_SYSTEM } from '../lib/tutorPrompt';
 
 const MessageSchema = z.object({
   role: z.enum(['user', 'assistant']),
@@ -25,6 +25,13 @@ export const SongPlanRequest = z.object({
     year: z.string().max(10).optional(),
   }),
   learner: z.object({ level: z.number().int().min(1).max(4), tonic: z.string().max(10), completedTopics: z.array(z.string().max(120)).max(60) }),
+  language: z.enum(['hinglish', 'english', 'hindi']),
+});
+
+/** The learner's measured week (built by the client from saved practice). */
+export const WeeklyRequest = z.object({
+  report: z.record(z.string(), z.unknown()).refine((r) => JSON.stringify(r).length <= 6000, 'report too large'),
+  level: z.number().int().min(1).max(4),
   language: z.enum(['hinglish', 'english', 'hindi']),
 });
 
@@ -255,6 +262,15 @@ export function tutorRouter(
     const { song, learner, language } = parsed.data;
     const prompt = `Song metadata (from the iTunes catalogue or typed by the learner):\n${JSON.stringify(song)}\n\nLearner: SurSadhana level ${learner.level}, current Sa ${learner.tonic}. Completed topics: ${learner.completedTopics.join('; ') || 'none yet'}.\nLanguage: ${language}.\n\nWrite the learning plan.`;
     await run({ system: SONG_PLAN_SYSTEM, messages: [{ role: 'user', content: prompt }], maxTokens: 3000 }, res, req);
+  });
+
+  r.post('/tutor/weekly', async (req, res) => {
+    if (!cfg.tutorProvider) return res.status(503).json({ error: 'not_configured', message: 'The AI summary needs ANTHROPIC_API_KEY or GEMINI_API_KEY on the server.' });
+    const parsed = WeeklyRequest.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'invalid_request', message: parsed.error.issues[0]?.message ?? 'Invalid request' });
+    const { report, level, language } = parsed.data;
+    const prompt = `Learner: SurSadhana level ${level}. Language: ${language}.\nTheir measured week (null = no data):\n${JSON.stringify(report, null, 1)}\n\nWrite the weekly summary.`;
+    await run({ system: WEEKLY_SYSTEM, messages: [{ role: 'user', content: prompt }], maxTokens: 800 }, res, req);
   });
 
   r.post('/tutor/voice', express.json({ limit: '4mb' }), async (req, res) => {

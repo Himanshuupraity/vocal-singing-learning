@@ -55,8 +55,11 @@ export interface ProfileSummary {
 
 export const account = {
   profiles: () => api<{ profiles: ProfileSummary[]; persistent: boolean; message?: string }>('/api/profiles'),
-  me: () => api<{ id: string; name: string; sync: { version: number; updatedAt: string } | null; message?: string }>('/api/auth/me'),
-  create: (name: string, pin: string) => api<{ id: string; name: string; message?: string }>('/api/profiles', { method: 'POST', body: JSON.stringify({ name, pin }) }),
+  me: () => api<{ id: string; name: string; hasRecovery?: boolean; sync: { version: number; updatedAt: string } | null; message?: string }>('/api/auth/me'),
+  create: (name: string, pin: string) => api<{ id: string; name: string; recoveryCode?: string; message?: string }>('/api/profiles', { method: 'POST', body: JSON.stringify({ name, pin }) }),
+  /** Forgot PIN: a recovery code sets a new PIN and returns a fresh code. */
+  recover: (id: string, code: string, newPin: string) => api<{ id: string; name: string; recoveryCode?: string; message?: string }>(`/api/profiles/${encodeURIComponent(id)}/recover`, { method: 'POST', body: JSON.stringify({ code, newPin }) }),
+  newRecoveryCode: (pin: string) => api<{ recoveryCode?: string; message?: string }>('/api/profiles/me/recovery', { method: 'POST', body: JSON.stringify({ pin }) }),
   unlock: (id: string, pin: string) => api<{ id: string; name: string; message?: string }>(`/api/profiles/${encodeURIComponent(id)}/unlock`, { method: 'POST', body: JSON.stringify({ pin }) }),
   logout: () => api('/api/auth/logout', { method: 'POST' }),
   changePin: (currentPin: string, newPin: string) => api<{ message?: string }>('/api/profiles/me/pin', { method: 'POST', body: JSON.stringify({ currentPin, newPin }) }),
