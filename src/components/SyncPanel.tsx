@@ -4,7 +4,7 @@ import { useAppData } from '../state/AppData';
 import { useSync } from '../hooks/useSync';
 import { account, loadMeta, saveMeta, type ProfileSummary } from '../lib/sync';
 import { Alert, Button, Card, Field, inputClass } from './ui';
-import { NewLearnerForm, ProfileButton, UnlockForm } from './LearnerForms';
+import { ChangePinForm, NewLearnerForm, ProfileButton, UnlockForm } from './LearnerForms';
 
 /** Saves this device's progress under a learner name + PIN, so any device can open it. */
 export function SyncPanel() {
@@ -18,6 +18,8 @@ export function SyncPanel() {
   const [auto, setAuto] = useState(loadMeta().auto);
   const [delPin, setDelPin] = useState('');
   const [showDelete, setShowDelete] = useState(false);
+  const [showPin, setShowPin] = useState(false);
+  const [pinChanged, setPinChanged] = useState(false);
   const meta = loadMeta();
   const { hash } = useLocation();
 
@@ -148,6 +150,29 @@ export function SyncPanel() {
             />
             Sync automatically after changes
           </label>
+          {showPin ? (
+            <ChangePinForm
+              onDone={() => {
+                setShowPin(false);
+                setPinChanged(true);
+              }}
+              onCancel={() => setShowPin(false)}
+            />
+          ) : (
+            <div>
+              <button
+                type="button"
+                className="text-sm font-medium text-primary underline"
+                onClick={() => {
+                  setPinChanged(false);
+                  setShowPin(true);
+                }}
+              >
+                Change PIN
+              </button>
+              {pinChanged && <p className="mt-1 text-sm text-success">PIN changed. Use the new PIN on your other devices.</p>}
+            </div>
+          )}
           {!showDelete ? (
             <button type="button" className="text-xs text-danger underline" onClick={() => setShowDelete(true)}>
               Remove my name and its saved copy

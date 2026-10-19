@@ -38,6 +38,8 @@ export interface Store {
   recordFailure(id: string, max: number, lockMs: number): Promise<{ failed: number; lockedUntil: number }>;
   clearFailures(id: string): Promise<void>;
   deleteProfile(id: string): Promise<void>;
+  /** Sets a new PIN hash and signs out every other device of this learner. */
+  changePin(id: string, pinHash: string, keepToken: string): Promise<void>;
   createSession(profileId: string, ttlMs: number): Promise<string>;
   sessionProfile(token: string): Promise<string | undefined>;
   deleteSession(token: string): Promise<void>;
@@ -114,6 +116,11 @@ export class SqlStore implements Store {
 
   async deleteProfile(id: string) {
     await this.run('DELETE FROM ss_profiles WHERE id = $1', [id]);
+  }
+
+  async changePin(id: string, pinHash: string, keepToken: string) {
+    await this.run('UPDATE ss_profiles SET pin_hash = $2, failed = 0, locked_until = 0 WHERE id = $1', [id, pinHash]);
+    await this.run('DELETE FROM ss_sessions WHERE profile_id = $1 AND token_hash <> $2', [id, hashToken(keepToken)]);
   }
 
   async createSession(profileId: string, ttlMs: number) {

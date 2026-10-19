@@ -59,6 +59,7 @@ export const account = {
   create: (name: string, pin: string) => api<{ id: string; name: string; message?: string }>('/api/profiles', { method: 'POST', body: JSON.stringify({ name, pin }) }),
   unlock: (id: string, pin: string) => api<{ id: string; name: string; message?: string }>(`/api/profiles/${encodeURIComponent(id)}/unlock`, { method: 'POST', body: JSON.stringify({ pin }) }),
   logout: () => api('/api/auth/logout', { method: 'POST' }),
+  changePin: (currentPin: string, newPin: string) => api<{ message?: string }>('/api/profiles/me/pin', { method: 'POST', body: JSON.stringify({ currentPin, newPin }) }),
   remove: (pin: string) => api<{ message?: string }>('/api/profiles/me', { method: 'DELETE', body: JSON.stringify({ pin }) }),
 };
 

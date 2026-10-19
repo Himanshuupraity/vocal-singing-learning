@@ -162,3 +162,58 @@ export function ProfileButton({ profile, onClick }: { profile: ProfileSummary; o
     </button>
   );
 }
+
+/** Changes the signed-in learner's PIN. Other devices then need the new PIN. */
+export function ChangePinForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
+  const [current, setCurrent] = useState('');
+  const [pin, setPin] = useState('');
+  const [pin2, setPin2] = useState('');
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const mismatch = pin2.length === 4 && pin !== pin2;
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErr(null);
+    setBusy(true);
+    try {
+      const r = await account.changePin(current, pin);
+      if (r.status === 204) onDone();
+      else {
+        setErr(r.body.message ?? 'Could not change the PIN.');
+        setCurrent('');
+      }
+    } catch (e2) {
+      setErr((e2 as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form className="space-y-3 rounded-xl border border-border p-3" onSubmit={submit}>
+      <Field label="Current PIN" htmlFor="cp-current">
+        <PinInput id="cp-current" value={current} onChange={setCurrent} autoFocus />
+      </Field>
+      <div className="flex flex-wrap gap-4">
+        <Field label="New PIN" htmlFor="cp-new">
+          <PinInput id="cp-new" value={pin} onChange={setPin} />
+        </Field>
+        <Field label="Type the new PIN again" htmlFor="cp-new2">
+          <PinInput id="cp-new2" value={pin2} onChange={setPin2} />
+        </Field>
+      </div>
+      {mismatch && <p className="text-sm text-danger">The two new PINs don’t match.</p>}
+      {err && <Alert tone="danger">{err}</Alert>}
+      <p className="text-xs text-muted">Other phones or laptops signed in as you will be asked for the new PIN.</p>
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" size="sm" disabled={busy || current.length !== 4 || pin.length !== 4 || pin !== pin2}>
+          {busy ? 'Saving…' : 'Change PIN'}
+        </Button>
+        <Button size="sm" variant="ghost" onClick={onCancel}>
+          Cancel
+        </Button>
+      </div>
+    </form>
+  );
+}

@@ -136,6 +136,25 @@ describe.each(backends)('learner profiles & sync (%s)', (_name, makeStore) => {
     expect((await a.get('/api/auth/me')).status).toBe(401);
   });
 
+  it('changes the PIN only with the current one, and signs out other devices', async () => {
+    const server = app();
+    const a = agent(server);
+    const { body } = await create(a, 'Nisha', '1357');
+    const b = agent(server);
+    expect((await b.post(`/api/profiles/${body.id}/unlock`).set(H).send({ pin: '1357' })).status).toBe(200);
+    const change = (pins: object) => a.post('/api/profiles/me/pin').set(H).send(pins);
+    expect((await agent(server).post('/api/profiles/me/pin').set(H).send({ currentPin: '1357', newPin: '2468' })).status).toBe(401);
+    expect((await change({ currentPin: '0000', newPin: '2468' })).body.message).toBe('Current PIN is incorrect.');
+    expect((await change({ currentPin: '1357', newPin: '24' })).status).toBe(400);
+    expect((await change({ currentPin: '1357', newPin: '1357' })).body.error).toBe('same_pin');
+    expect((await change({ currentPin: '1357', newPin: '2468' })).status).toBe(204);
+    // this device stays signed in; the other one has to enter the new PIN
+    expect((await a.get('/api/auth/me')).status).toBe(200);
+    expect((await b.get('/api/auth/me')).status).toBe(401);
+    expect((await b.post(`/api/profiles/${body.id}/unlock`).set(H).send({ pin: '1357' })).status).toBe(401);
+    expect((await b.post(`/api/profiles/${body.id}/unlock`).set(H).send({ pin: '2468' })).status).toBe(200);
+  });
+
   it('deletes a profile and its data only with the correct PIN', async () => {
     const a = agent();
     await create(a, 'Esha', '5555');

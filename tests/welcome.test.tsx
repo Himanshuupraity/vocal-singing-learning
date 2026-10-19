@@ -29,14 +29,14 @@ function serve(profiles: { id: string; name: string; lastActive: string | null }
 }
 
 /** Fresh modules per test: sync state is module-level, like it is per page load in the browser. */
-async function renderApp() {
+async function renderApp(path = '/') {
   vi.resetModules();
   const { App } = await import('../src/App');
   const { AppDataProvider } = await import('../src/state/AppData');
   const { LocalStorageAdapter } = await import('../src/storage/adapter');
   return render(
     <AppDataProvider adapter={new LocalStorageAdapter()}>
-      <MemoryRouter initialEntries={['/']}>
+      <MemoryRouter initialEntries={[path]}>
         <App />
       </MemoryRouter>
     </AppDataProvider>,
@@ -88,5 +88,34 @@ describe('Who’s practising? (new device)', () => {
     }) as never;
     await renderApp();
     expect(await screen.findByLabelText(/What should we call you/)).toHaveValue('');
+  });
+});
+
+describe('Change PIN (Settings)', () => {
+  it('changes the PIN with the current one and confirms it', async () => {
+    localStorage.setItem('sursadhana:data', JSON.stringify(saved('Meera')));
+    localStorage.setItem('sursadhana:sync', JSON.stringify({ name: 'Meera', auto: false }));
+    const sent: unknown[] = [];
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      if (url === '/api/auth/me') return json(200, { id: 'p1', name: 'Meera', sync: null });
+      if (url === '/api/profiles/me/pin') {
+        const body = JSON.parse(String(init!.body));
+        sent.push(body);
+        return body.currentPin === '2468' ? new Response(null, { status: 204 }) : json(401, { message: 'Current PIN is incorrect.' });
+      }
+      return json(200, { ok: true, tutor: { configured: false, model: null }, youtube: { configured: false }, songs: { configured: true } });
+    }) as never;
+    await renderApp('/settings');
+    await userEvent.click(await screen.findByRole('button', { name: 'Change PIN' }));
+    await userEvent.type(screen.getByLabelText('Current PIN'), '1111');
+    await userEvent.type(screen.getByLabelText('New PIN'), '9753');
+    await userEvent.type(screen.getByLabelText('Type the new PIN again'), '9753');
+    await userEvent.click(screen.getByRole('button', { name: 'Change PIN' }));
+    expect(await screen.findByText('Current PIN is incorrect.')).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('Current PIN'), '2468');
+    await userEvent.click(screen.getByRole('button', { name: 'Change PIN' }));
+    expect(await screen.findByText(/PIN changed/)).toBeInTheDocument();
+    expect(sent.at(-1)).toEqual({ currentPin: '2468', newPin: '9753' });
+    expect(JSON.stringify(localStorage)).not.toMatch(/9753|2468/);
   });
 });

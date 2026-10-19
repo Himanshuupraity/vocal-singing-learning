@@ -52,6 +52,7 @@ export function accountRouter(store: Store) {
     const id = token ? await store.sessionProfile(token) : undefined;
     if (!id) return res.status(401).json({ error: 'unauthenticated', message: 'Please choose your name again.' });
     res.locals.profileId = id;
+    res.locals.token = token;
     next();
   };
 
@@ -99,6 +100,23 @@ export function accountRouter(store: Store) {
     const token = readCookie(req, COOKIE);
     if (token) await store.deleteSession(token);
     res.clearCookie(COOKIE, { path: '/api' });
+    res.status(204).end();
+  });
+
+  r.post('/profiles/me/pin', authLimiter, auth, async (req, res) => {
+    const p = z.object({ currentPin: z.string().max(10), newPin: Pin }).safeParse(req.body);
+    if (!p.success) return res.status(400).json({ error: 'invalid_request', message: p.error.issues[0]?.message ?? 'Invalid PIN.' });
+    const prof = await store.profileById(res.locals.profileId);
+    if (!prof) return res.status(401).json({ error: 'unauthenticated' });
+    if (prof.lockedUntil > Date.now()) return res.status(423).json({ error: 'locked', message: lockedMessage(prof.lockedUntil) });
+    // A wrong current PIN counts towards the same lockout as opening the profile.
+    if (!(await verifyPassword(p.data.currentPin, prof.pinHash))) {
+      const f = await store.recordFailure(prof.id, MAX_FAILS, LOCK_MS);
+      if (f.lockedUntil > Date.now()) return res.status(423).json({ error: 'locked', message: lockedMessage(f.lockedUntil) });
+      return res.status(401).json({ error: 'wrong_pin', message: 'Current PIN is incorrect.' });
+    }
+    if (p.data.newPin === p.data.currentPin) return res.status(400).json({ error: 'same_pin', message: 'The new PIN is the same as the current one.' });
+    await store.changePin(prof.id, await hashPassword(p.data.newPin), res.locals.token);
     res.status(204).end();
   });
 
