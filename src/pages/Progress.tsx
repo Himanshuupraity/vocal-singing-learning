@@ -198,7 +198,7 @@ export default function Progress() {
             <ul className="mt-2 space-y-1.5 text-sm">
               {data.earTests.slice(-5).reverse().map((t) => (
                 <li key={t.id}>
-                  {new Date(t.at).toLocaleDateString()} · {t.kind === 'same-different' ? 'Same/different' : 'Higher/lower'}: <strong>{Math.round((t.correct / t.questions) * 100)}%</strong> ({t.correct}/{t.questions})
+                  {new Date(t.at).toLocaleDateString()} · {t.kind === 'same-different' ? 'Same/different' : t.kind === 'dictation' ? 'Sargam dictation' : 'Higher/lower'}: <strong>{Math.round((t.correct / t.questions) * 100)}%</strong> ({t.correct}/{t.questions})
                 </li>
               ))}
               {data.rhythm.slice(-5).reverse().map((r) => (

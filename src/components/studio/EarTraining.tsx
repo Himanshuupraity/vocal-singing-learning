@@ -4,8 +4,9 @@ import { midiToFreq, tonicMidi } from '../../music/theory';
 import { useAppData } from '../../state/AppData';
 import { uid } from '../../lib/dates';
 import { Alert, Button, ProgressBar, cx } from '../ui';
+import { SargamDictation } from './SargamDictation';
 
-type Kind = 'same-different' | 'higher-lower';
+type Kind = 'same-different' | 'higher-lower' | 'dictation';
 interface Q {
   a: number;
   b: number;
@@ -13,7 +14,7 @@ interface Q {
 }
 
 /** Gap in semitones (as a fraction) — adapts to performance for higher/lower. */
-function makeQ(kind: Kind, baseMidi: number, difficulty: number): Q {
+function makeQ(kind: Exclude<Kind, 'dictation'>, baseMidi: number, difficulty: number): Q {
   const root = baseMidi + Math.floor(Math.random() * 8);
   if (kind === 'same-different') {
     const same = Math.random() < 0.45;
@@ -49,6 +50,7 @@ export function EarTraining({ context = 'studio', initialKind = 'same-different'
     setCorrect(0);
     setFinished(false);
     setFeedback(null);
+    if (kind === 'dictation') return;
     const nq = makeQ(kind, base, 0);
     setQ(nq);
     void play(nq);
@@ -71,6 +73,7 @@ export function EarTraining({ context = 'studio', initialKind = 'same-different'
   };
 
   const next = () => {
+    if (kind === 'dictation') return;
     const difficulty = Math.floor((correct / Math.max(1, n + 1)) * 4);
     const nq = makeQ(kind, base, difficulty);
     setN((x) => x + 1);
@@ -85,18 +88,20 @@ export function EarTraining({ context = 'studio', initialKind = 'same-different'
     <div className="space-y-4">
       <div>
         <h3 className="text-lg font-semibold">Ear Training</h3>
-        <p className="text-sm text-muted">Listening carefully comes before singing in tune. Two notes play — answer the question.</p>
+        <p className="text-sm text-muted">Listening carefully comes before singing in tune. Answer what you hear.</p>
       </div>
       {!lockKind && (
-        <div className="flex gap-2">
-          {(['same-different', 'higher-lower'] as Kind[]).map((k) => (
+        <div className="flex flex-wrap gap-2">
+          {(['same-different', 'higher-lower', 'dictation'] as Kind[]).map((k) => (
             <button key={k} type="button" aria-pressed={kind === k} onClick={() => (setKind(k), setQ(null), setFinished(false))} className={cx('rounded-lg px-3 py-1.5 text-sm', kind === k ? 'bg-primary text-on-primary' : 'bg-surface-2')}>
-              {k === 'same-different' ? 'Same or different?' : 'Higher or lower?'}
+              {k === 'same-different' ? 'Same or different?' : k === 'higher-lower' ? 'Higher or lower?' : 'Sargam dictation'}
             </button>
           ))}
         </div>
       )}
-      {!q ? (
+      {kind === 'dictation' ? (
+        <SargamDictation context={context} questions={questions} onComplete={onComplete} />
+      ) : !q ? (
         <Button icon="ear" onClick={startNew}>
           Start {questions} questions
         </Button>

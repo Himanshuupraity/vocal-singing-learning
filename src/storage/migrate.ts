@@ -78,6 +78,8 @@ export function migrate(raw: unknown): LoadResult {
   const tu = isObj(raw.tutor) ? raw.tutor : {};
   d.tutor = { messages: arr(tu.messages, LIMITS.tutorMessages), memory: arr(tu.memory, LIMITS.tutorMemory) };
   d.ranges = arr<AppData['ranges'][number]>(raw.ranges, 100).filter((r) => r && typeof r.lowMidi === 'number' && typeof r.highMidi === 'number');
+  d.alankars = Object.fromEntries(Object.entries(obj<AppData['alankars'][string]>(raw.alankars)).filter(([, v]) => isObj(v) && typeof v.bestBpm === 'number' && typeof v.lastBpm === 'number'));
+  d.longNotes = arr<AppData['longNotes'][number]>(raw.longNotes, LIMITS.longNotes).filter((r) => isObj(r) && typeof r.sec === 'number' && typeof r.at === 'string');
   d.patterns = arr<AppData['patterns'][number]>(raw.patterns, LIMITS.patterns).filter(
     (p) => isObj(p) && typeof p.id === 'string' && typeof p.name === 'string' && Array.isArray(p.notes) && p.notes.length > 0 && p.notes.every((t) => typeof t === 'string' && isValidSwaraToken(t)),
   );

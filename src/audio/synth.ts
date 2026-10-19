@@ -170,3 +170,37 @@ export async function playPair(a: number, b: number, noteDur = 0.9, gap = 0.35) 
   const s2 = playFreq(b, { when: t + noteDur + gap, duration: noteDur, timbre: 'pure' });
   return { stop: () => (s1(), s2()), endsAt: t + noteDur * 2 + gap };
 }
+
+/** Swings between two notes `rateHz` times a second (gamak / andolan demo), after holding the lower note briefly. */
+export async function playOscillation(lowFreq: number, highFreq: number, rateHz: number, duration: number) {
+  const ctx = await ensureRunning();
+  const now = ctx.currentTime + 0.05;
+  const osc = ctx.createOscillator();
+  osc.setPeriodicWave(periodicWave(ctx, 'reed'));
+  osc.frequency.setValueAtTime(lowFreq, now);
+  const half = 1 / rateHz / 2;
+  let t = now + 0.5;
+  osc.frequency.setValueAtTime(lowFreq, t);
+  for (let up = true; t < now + duration; up = !up) {
+    t += half;
+    osc.frequency.exponentialRampToValueAtTime(up ? highFreq : lowFreq, t);
+  }
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, now);
+  g.gain.exponentialRampToValueAtTime(0.32, now + 0.04);
+  g.gain.setValueAtTime(0.32, t - 0.1);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
+  osc.connect(g).connect(getMaster());
+  osc.start(now);
+  osc.stop(t + 0.15);
+  return {
+    stop: () => {
+      try {
+        osc.stop();
+      } catch {
+        /* already stopped */
+      }
+    },
+    endsAt: t + 0.15,
+  };
+}

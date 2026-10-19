@@ -13,6 +13,9 @@ import { RaagPractice } from '../components/studio/RaagPractice';
 import { SurGraph } from '../components/studio/SurGraph';
 import { LiveCoach } from '../components/studio/LiveCoach';
 import { SongToExercise } from '../components/studio/SongToExercise';
+import { AlankarTrainer } from '../components/studio/AlankarTrainer';
+import { MeendPractice } from '../components/studio/MeendPractice';
+import { LongNote } from '../components/studio/LongNote';
 import { isValidSwaraToken } from '../music/theory';
 import { usePracticeTimer } from '../hooks/usePracticeTimer';
 import { TAAL_IDS, type TaalId } from '../music/taal';
@@ -22,6 +25,9 @@ const TOOLS: { id: string; label: string; icon: IconName }[] = [
   { id: 'coach', label: 'Live Coach', icon: 'mic' },
   { id: 'drone', label: 'Tanpura Drone', icon: 'wave' },
   { id: 'sargam', label: 'Sargam Player', icon: 'music' },
+  { id: 'alankar', label: 'Alankar Trainer', icon: 'repeat' },
+  { id: 'meend', label: 'Meend & Gamak', icon: 'path' },
+  { id: 'breath', label: 'Long Note', icon: 'wind' },
   { id: 'raag', label: 'Raag Practice', icon: 'flame' },
   { id: 'taal', label: 'Taal & Tabla', icon: 'drum' },
   { id: 'compare', label: 'Sur Graph', icon: 'graph' },
@@ -74,6 +80,9 @@ export default function Studio() {
           {active === 'raag' && <RaagPractice />}
           {active === 'compare' && <SurGraph initialPattern={sp.get('pattern') ?? undefined} />}
           {active === 'coach' && <LiveCoach />}
+          {active === 'alankar' && <AlankarTrainer />}
+          {active === 'meend' && <MeendPractice />}
+          {active === 'breath' && <LongNote />}
           {active === 'song' && <SongToExercise songId={sp.get('song') ?? undefined} />}
         </div>
       </Card>

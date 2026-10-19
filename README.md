@@ -78,6 +78,10 @@ Instant above/below-sur cues come from the app's own pitch detector (no AI, no n
 - **Taal & Tabla** — Teentaal, Keharwa, Dadra, Rupak, Jhaptaal on a synthesized tabla (`src/audio/tabla.ts`) tuned to Sa, optionally with the tanpura.
 - **Sur Graph** — your pitch against a pattern's target notes, or against a teacher's recording/audio file (aligned, octave-folded, with key shift).
 - **Range Finder** — suggests a Sa from the measured range (with harmonium scale names) and charts range history.
+- **Alankar Trainer** — 9 alankar shapes (`src/music/alankar.ts`) on the shuddh scale or a raag's notes, sung on the beat with per-note checks (shared `SingAlong` engine with the Sur Graph); tempo steps up after clean runs, best tempo saved per alankar.
+- **Ear Training → Sargam dictation** — hear Sa and a 3–5 note phrase, tap the swaras; five levels up to komal/teevra swaras.
+- **Meend & Gamak** — glide analysis (start/landing accuracy, stopping on in-between notes, reversals, breaks, overshoot) and swing analysis (rate, size, evenness) in `src/music/meend.ts`.
+- **Long Note** — longest comfortable hold, steadiness and in-tune %, with history and personal best.
 - **Song → Exercise** — hum a phrase (or pick a voice-only clip); the app segments held notes, guesses the tune's Sa, writes sargam and saves it as a reusable exercise (`patterns` in the progress data). All on-device.
 
 ### YouTube setup

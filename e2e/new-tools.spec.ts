@@ -11,6 +11,7 @@ async function fakeSinger(page: Page, melody: [number, number][]) {
       const ctx = new AudioContext();
       const o = ctx.createOscillator();
       const g = ctx.createGain();
+      g.gain.value = 0;
       let t = ctx.currentTime + 0.05;
       for (let loop = 0; loop < 40; loop++)
         for (const [f, sec] of m) {

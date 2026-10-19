@@ -80,7 +80,7 @@ export interface EarTestRecord {
   context: string;
   questions: number;
   correct: number;
-  kind: 'same-different' | 'higher-lower' | 'swara-id';
+  kind: 'same-different' | 'higher-lower' | 'swara-id' | 'dictation';
 }
 
 export interface RhythmRecord {
@@ -178,6 +178,24 @@ export interface RangeRecord {
   highMidi: number;
 }
 
+/** Best clean tempo per alankar + scale (key "alankarId:scaleId"). */
+export interface AlankarProgress {
+  bestBpm: number;
+  lastBpm: number;
+  lastPct: number;
+  at: string;
+}
+
+/** One long-note (breath) hold. */
+export interface LongNoteRecord {
+  id: string;
+  at: string;
+  swara: SwaraToken;
+  sec: number;
+  steadinessCents: number;
+  inTunePct: number;
+}
+
 /** A sargam pattern the learner made, e.g. from a song phrase they hummed or uploaded. */
 export interface MyPattern {
   id: string;
@@ -216,6 +234,8 @@ export interface AppData {
   baseline?: BaselineResult;
   ranges: RangeRecord[];
   patterns: MyPattern[];
+  alankars: Record<string, AlankarProgress>;
+  longNotes: LongNoteRecord[];
 }
 
 export function defaultData(now = new Date()): AppData {
@@ -250,8 +270,10 @@ export function defaultData(now = new Date()): AppData {
     tutor: { messages: [], memory: [] },
     ranges: [],
     patterns: [],
+    alankars: {},
+    longNotes: [],
   };
 }
 
 /** Caps to keep localStorage well under browser quotas (~5MB). */
-export const LIMITS = { pitchAttempts: 3000, earTests: 500, rhythm: 500, sessions: 2000, tutorMessages: 60, tutorMemory: 30, patterns: 100 };
+export const LIMITS = { pitchAttempts: 3000, earTests: 500, rhythm: 500, sessions: 2000, tutorMessages: 60, tutorMemory: 30, patterns: 100, longNotes: 500 };

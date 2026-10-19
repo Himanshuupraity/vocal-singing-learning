@@ -2,7 +2,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import { seedLearner } from './helpers';
 
-const PAGES = ['/', '/learn', '/learn/lesson/l1-what-is-singing', '/riyaz', '/studio/pitch', '/studio/drone', '/studio/taal', '/studio/keyboard', '/studio/raag', '/studio/compare', '/studio/coach', '/studio/song', '/studio/range', '/tutor', '/songs', '/videos', '/progress', '/settings', '/privacy'];
+const PAGES = ['/', '/learn', '/learn/lesson/l1-what-is-singing', '/riyaz', '/studio/pitch', '/studio/drone', '/studio/taal', '/studio/keyboard', '/studio/raag', '/studio/alankar', '/studio/meend', '/studio/breath', '/studio/ear', '/studio/compare', '/studio/coach', '/studio/song', '/studio/range', '/tutor', '/songs', '/videos', '/progress', '/settings', '/privacy'];
 
 for (const theme of ['light', 'dark'] as const) {
   for (const path of PAGES) {
