@@ -163,7 +163,8 @@ describe.each(backends)('learner profiles & sync (%s)', (_name, makeStore) => {
     expect((await a.delete('/api/profiles/me').set(H).send({ pin: '5555' })).status).toBe(204);
     expect((await a.get('/api/profiles')).body.profiles).toEqual([]);
   });
-});
+  // Each Postgres test boots a fresh in-process PGlite (WebAssembly), which takes a few seconds on CI runners.
+}, 30_000);
 
 describe('client error reports', () => {
   it('stores a report as a JSON line and validates input', async () => {
