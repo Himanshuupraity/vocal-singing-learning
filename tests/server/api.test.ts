@@ -221,6 +221,36 @@ describe('voice feedback', () => {
     expect(p.contents[0].parts[1].text).toMatch(/Sa = C3/);
     expect(p.config.systemInstruction).toMatch(/source of truth for pitch/);
   });
+
+  describe('live coach', () => {
+    it('needs a Gemini key', async () => {
+      const claudeOnly = loadConfig({ ANTHROPIC_API_KEY: 'sk-test' } as NodeJS.ProcessEnv);
+      expect((await request(createApp(claudeOnly)).post('/api/tutor/coach').send(body())).status).toBe(503);
+    });
+
+    it('accepts only short WAV snippets', async () => {
+      const app = createApp(geminiOnly, { makeGemini: () => fake([]) as never });
+      expect((await request(app).post('/api/tutor/coach').send(body(Buffer.from('plain text, not audio '.repeat(10)).toString('base64')))).status).toBe(400);
+      // ~40 s of audio is too long for a live tip (the body parser or the schema refuses it).
+      expect((await request(app).post('/api/tutor/coach').send(body(wav(1_300_000)))).status).toBeGreaterThanOrEqual(400);
+    });
+
+    it('sends the snippet, the target and the previous tips, and streams one short tip', async () => {
+      const calls: unknown[] = [];
+      const app = createApp(geminiOnly, { makeGemini: () => fake(calls) as never });
+      const r = await request(app)
+        .post('/api/tutor/coach')
+        .send({ ...body(wav(200_000)), target: 'Holding Sa', previous: ['Open your mouth a little more on "aa".'] });
+      expect(r.status).toBe(200);
+      expect(r.text).toContain('Aapka Sa steady tha.');
+      const p = calls[0] as { contents: { parts: ({ inlineData?: unknown } & { text?: string })[] }[]; config: { systemInstruction: string; maxOutputTokens: number } };
+      expect(p.contents[0].parts[0].inlineData).toBeDefined();
+      expect(p.contents[0].parts[1].text).toMatch(/Holding Sa/);
+      expect(p.contents[0].parts[1].text).toMatch(/Open your mouth a little more/);
+      expect(p.config.systemInstruction).toMatch(/ONE short spoken-style tip/);
+      expect(p.config.maxOutputTokens).toBeLessThanOrEqual(600);
+    });
+  });
 });
 
 describe('youtube', () => {

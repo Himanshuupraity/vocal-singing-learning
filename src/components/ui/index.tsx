@@ -154,10 +154,11 @@ export function EmptyState({ icon = 'info', title, children, action, page }: { i
   );
 }
 
-export function Tabs<T extends string>({ tabs, value, onChange, label }: { tabs: { id: T; label: string; icon?: IconName }[]; value: T; onChange: (v: T) => void; label: string }) {
+/** `wrap`: on wider screens show every tab in wrapped rows instead of one scrolling row. */
+export function Tabs<T extends string>({ tabs, value, onChange, label, wrap }: { tabs: { id: T; label: string; icon?: IconName }[]; value: T; onChange: (v: T) => void; label: string; wrap?: boolean }) {
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   return (
-    <div role="tablist" aria-label={label} className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
+    <div role="tablist" aria-label={label} className={cx('-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none]', wrap && 'sm:flex-wrap sm:overflow-visible')}>
       {tabs.map((t, i) => (
         <button
           key={t.id}

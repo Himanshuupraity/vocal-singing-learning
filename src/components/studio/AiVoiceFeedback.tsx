@@ -1,10 +1,8 @@
 import { useRef, useState } from 'react';
-import { analyzeSamples, decodeToMono } from '../../audio/offlineAnalysis';
-import { encodeWav, resample, toBase64 } from '../../audio/wav';
+import { decodeToMono } from '../../audio/offlineAnalysis';
+import { voicePayload } from '../../lib/voicePayload';
 import { useServerStatus } from '../../hooks/useServerStatus';
 import { ApiError, streamPost } from '../../lib/sse';
-import { currentLevel } from '../../lib/progress';
-import { swaraLabel, tonicLabel } from '../../music/theory';
 import { useAppData } from '../../state/AppData';
 import type { RecordingEntry } from '../../storage/recordings';
 import { Alert, Button, Spinner } from '../ui';
@@ -36,28 +34,11 @@ export function AiVoiceFeedback({ recording }: { recording: RecordingEntry }) {
     abort.current = new AbortController();
     try {
       const { samples, sampleRate } = await decodeToMono(recording.blob);
-      const a = analyzeSamples(samples, sampleRate, data.profile.tonic);
+      const { analysis: a, body } = voicePayload(samples, sampleRate, data, { label: recording.label, exercise: recording.exercise, maxSec: MAX_SEC });
       if (a.voicedSec < 0.5) throw new ApiError('empty', 'No clear singing was found in this recording, so there is nothing for the AI to listen to. Try recording again a little closer to the mic.');
-      const audio = toBase64(encodeWav(resample(samples, sampleRate, undefined, MAX_SEC)));
       await streamPost(
         '/api/tutor/voice',
-        {
-          audio,
-          mimeType: 'audio/wav',
-          language: data.profile.language,
-          exercise: recording.exercise,
-          label: recording.label,
-          level: currentLevel(data),
-          tonic: tonicLabel(data.profile.tonic),
-          measured: {
-            durationSec: Math.min(a.durationSec, 600),
-            voicedSec: Math.min(a.voicedSec, 600),
-            lowest: a.lowestToken ? swaraLabel(a.lowestToken) : null,
-            highest: a.highestToken ? swaraLabel(a.highestToken) : null,
-            steadinessCents: a.steadinessCents,
-            swaras: a.swaras.slice(0, 12).map((s) => ({ label: s.label, sec: Math.round(s.sec * 10) / 10, avgCents: s.avgCents })),
-          },
-        },
+        body,
         (t) => setText((x) => x + t),
         abort.current.signal,
       );

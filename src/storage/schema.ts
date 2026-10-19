@@ -178,6 +178,17 @@ export interface RangeRecord {
   highMidi: number;
 }
 
+/** A sargam pattern the learner made, e.g. from a song phrase they hummed or uploaded. */
+export interface MyPattern {
+  id: string;
+  name: string;
+  notes: SwaraToken[];
+  source: 'song' | 'manual';
+  /** My Songs entry this phrase came from, if any */
+  songId?: string;
+  createdAt: string;
+}
+
 export interface BaselineResult {
   at: string;
   pitchMatchedPct: number | null;
@@ -204,6 +215,7 @@ export interface AppData {
   tutor: { messages: TutorMessage[]; memory: string[] };
   baseline?: BaselineResult;
   ranges: RangeRecord[];
+  patterns: MyPattern[];
 }
 
 export function defaultData(now = new Date()): AppData {
@@ -237,8 +249,9 @@ export function defaultData(now = new Date()): AppData {
     songs: {},
     tutor: { messages: [], memory: [] },
     ranges: [],
+    patterns: [],
   };
 }
 
 /** Caps to keep localStorage well under browser quotas (~5MB). */
-export const LIMITS = { pitchAttempts: 3000, earTests: 500, rhythm: 500, sessions: 2000, tutorMessages: 60, tutorMemory: 30 };
+export const LIMITS = { pitchAttempts: 3000, earTests: 500, rhythm: 500, sessions: 2000, tutorMessages: 60, tutorMemory: 30, patterns: 100 };

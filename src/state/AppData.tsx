@@ -52,6 +52,7 @@ export function AppDataProvider({ children, adapter }: { children: ReactNode; ad
       draft.earTests = draft.earTests.slice(-LIMITS.earTests);
       draft.rhythm = draft.rhythm.slice(-LIMITS.rhythm);
       draft.sessions = draft.sessions.slice(-LIMITS.sessions);
+      draft.patterns = draft.patterns.slice(-LIMITS.patterns);
       draft.tutor.messages = draft.tutor.messages.slice(-LIMITS.tutorMessages);
       draft.tutor.memory = draft.tutor.memory.slice(-LIMITS.tutorMemory);
       return draft;

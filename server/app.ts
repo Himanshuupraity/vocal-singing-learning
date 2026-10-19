@@ -18,7 +18,7 @@ export function createApp(cfg: ServerConfig, deps: { makeClient?: ClientFactory;
   app.set('trust proxy', 1);
   const smallJson = express.json({ limit: '64kb', type: ['application/json', 'text/plain'] });
   // Sync and voice feedback carry larger bodies and parse them on their own routes.
-  app.use((req, res, next) => (req.path === '/api/sync' || req.path === '/api/tutor/voice' ? next() : smallJson(req, res, next)));
+  app.use((req, res, next) => (['/api/sync', '/api/tutor/voice', '/api/tutor/coach'].includes(req.path) ? next() : smallJson(req, res, next)));
   app.use((_, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');

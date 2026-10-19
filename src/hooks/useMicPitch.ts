@@ -93,5 +93,8 @@ export function useMicPitch() {
     [start, update],
   );
 
-  return { state, error, frame, start, stop, subscribe, devices, chooseDevice, deviceId, deviceNotice, unsupported: micSupport() };
+  /** The live microphone stream while the mic is on (e.g. to record a snippet of it). */
+  const getStream = useCallback(() => handle.current?.stream ?? null, []);
+
+  return { state, error, frame, start, stop, subscribe, getStream, devices, chooseDevice, deviceId, deviceNotice, unsupported: micSupport() };
 }

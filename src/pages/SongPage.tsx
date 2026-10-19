@@ -282,6 +282,27 @@ export default function SongPage() {
             ))}
           </ul>
         )}
+        <div className="mt-4 rounded-xl bg-surface-2 p-3 text-sm">
+          <p className="font-medium">Turn a phrase into a sargam exercise</p>
+          <p className="text-muted">Hum a phrase of this song; the app finds its notes and makes an exercise on your own Sa.</p>
+          <LinkButton to={`/studio/song?song=${encodeURIComponent(song.id)}`} size="sm" variant="secondary" className="mt-2">
+            Make an exercise
+          </LinkButton>
+          {data.patterns.some((p) => p.songId === song.id) && (
+            <ul className="mt-2 space-y-1">
+              {data.patterns
+                .filter((p) => p.songId === song.id)
+                .map((p) => (
+                  <li key={p.id}>
+                    <Link className="text-primary underline" to={`/studio/compare?pattern=${encodeURIComponent(`my:${p.id}`)}`}>
+                      {p.name}
+                    </Link>{' '}
+                    <span className="font-mono text-xs text-muted">{p.notes.length} notes</span>
+                  </li>
+                ))}
+            </ul>
+          )}
+        </div>
       </Card>
 
       <Card>

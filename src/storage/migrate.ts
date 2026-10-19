@@ -1,4 +1,4 @@
-import { WESTERN_NOTES } from '../music/theory';
+import { isValidSwaraToken, WESTERN_NOTES } from '../music/theory';
 import { defaultData, LIMITS, SCHEMA_VERSION, SESSION_LENGTHS, type AppData } from './schema';
 
 type Json = Record<string, unknown>;
@@ -78,6 +78,9 @@ export function migrate(raw: unknown): LoadResult {
   const tu = isObj(raw.tutor) ? raw.tutor : {};
   d.tutor = { messages: arr(tu.messages, LIMITS.tutorMessages), memory: arr(tu.memory, LIMITS.tutorMemory) };
   d.ranges = arr<AppData['ranges'][number]>(raw.ranges, 100).filter((r) => r && typeof r.lowMidi === 'number' && typeof r.highMidi === 'number');
+  d.patterns = arr<AppData['patterns'][number]>(raw.patterns, LIMITS.patterns).filter(
+    (p) => isObj(p) && typeof p.id === 'string' && typeof p.name === 'string' && Array.isArray(p.notes) && p.notes.length > 0 && p.notes.every((t) => typeof t === 'string' && isValidSwaraToken(t)),
+  );
   if (isObj(raw.baseline)) d.baseline = raw.baseline as unknown as AppData['baseline'];
   if (typeof raw.createdAt === 'string') d.createdAt = raw.createdAt;
   d.version = SCHEMA_VERSION;

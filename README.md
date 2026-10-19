@@ -70,6 +70,16 @@ With Claude, the tutor uses `claude-opus-5-5` with streaming, prompt caching for
 ### AI voice feedback (Gemini only)
 In the **Recording Journal**, each clip has **Get AI voice feedback**. After the learner confirms (every time), the browser decodes the clip, runs the app's own pitch analysis, converts the first 60 s to 16 kHz mono WAV, and posts both to `POST /api/tutor/voice`. The server forwards them to Gemini, which *listens* for tone, breath, strain and steadiness while treating the app's pitch numbers as the source of truth, and streams the reply back. It needs `GEMINI_API_KEY` (Claude can't take audio input), works even when Claude runs the chat, and SurSadhana never stores the audio.
 
+### Live Coach (Practice Studio)
+Instant above/below-sur cues come from the app's own pitch detector (no AI, no network). The optional **AI coach** (after consent) records the mic in 30 s pieces with `MediaRecorder`, and posts the last 20 s as 16 kHz WAV plus its pitch analysis and the previous tips to `POST /api/tutor/coach`, which asks Gemini for one short tip. Snippets with under 4 s of clear singing are not sent. Needs `GEMINI_API_KEY`.
+
+### Other practice tools
+- **Raag Practice** — Yaman, Bhupali, Bilawal, Kafi, Bhairav (data in `src/data/ragas.ts`, matching the Level 3 lessons): listen over the tanpura, sing phrases with a per-note check, or sing freely and get varjit-swar warnings.
+- **Taal & Tabla** — Teentaal, Keharwa, Dadra, Rupak, Jhaptaal on a synthesized tabla (`src/audio/tabla.ts`) tuned to Sa, optionally with the tanpura.
+- **Sur Graph** — your pitch against a pattern's target notes, or against a teacher's recording/audio file (aligned, octave-folded, with key shift).
+- **Range Finder** — suggests a Sa from the measured range (with harmonium scale names) and charts range history.
+- **Song → Exercise** — hum a phrase (or pick a voice-only clip); the app segments held notes, guesses the tune's Sa, writes sargam and saves it as a reusable exercise (`patterns` in the progress data). All on-device.
+
 ### YouTube setup
 1. In Google Cloud Console, enable **YouTube Data API v3** and create an API key (restrict it to that API).
 2. Put it in `.env`: `YOUTUBE_API_KEY=...` and restart.

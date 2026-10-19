@@ -1,5 +1,7 @@
 import { ensureRunning, getMaster } from './context';
 import { beatRole, TAALS, type BeatRole, type TaalId } from '../music/taal';
+import { midiToFreq, tonicMidi, type Tonic } from '../music/theory';
+import { playBol } from './tabla';
 
 export interface MetronomeOptions {
   bpm: number;
@@ -11,6 +13,10 @@ export interface MetronomeOptions {
   /** speak / sound distinct count clicks */
   accentFirst: boolean;
   onBeat?: (beatIndex: number, role: BeatRole) => void;
+  /** 'tabla' plays the taal's theka bols on a synthesized tabla (taal mode only); default 'click'. */
+  sound?: 'click' | 'tabla';
+  /** Sa, so the tabla's treble drum is tuned to it like a real tabla. */
+  tonic?: Tonic;
 }
 
 /**
@@ -21,6 +27,7 @@ export interface MetronomeOptions {
  * In taal mode the sound differs by beat role: sam = strongest, tali = medium,
  * khali = soft hollow "wave" sound, other matras = light tick. This shows the
  * taal's structure, which a plain metronome (equal beats) does not have.
+ * With sound 'tabla', each matra plays its theka bol on a synthesized tabla.
  */
 export class Metronome {
   private timer: number | null = null;
@@ -67,7 +74,10 @@ export class Metronome {
     while (this.nextTime < ctx.currentTime + 0.12) {
       const idx = this.beat % this.cycleLength();
       const role = this.roleOf(idx);
-      this.click(ctx, this.nextTime, role);
+      if (this.opts.sound === 'tabla' && this.opts.taal) {
+        const sa = midiToFreq(tonicMidi(this.opts.tonic ?? { note: 'C', octave: 3 }));
+        playBol(ctx, getMaster(), TAALS[this.opts.taal].theka[idx], this.nextTime, sa, this.opts.volume * (role === 'sam' ? 1 : 0.8));
+      } else this.click(ctx, this.nextTime, role);
       const delay = Math.max(0, (this.nextTime - ctx.currentTime) * 1000);
       const cb = this.opts.onBeat;
       this.uiTimers.push(window.setTimeout(() => this.running && cb?.(idx, role), delay));

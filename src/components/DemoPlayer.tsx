@@ -84,7 +84,7 @@ export function DemoPlayer({ demo }: { demo: AudioDemo }) {
         }
         case 'taal': {
           const taal = TAALS[demo.taal];
-          const m = new Metronome({ bpm: demo.bpm, taal: demo.taal, beatsPerBar: 4, volume: 0.8, accentFirst: true, onBeat: (i) => setActive(i) });
+          const m = new Metronome({ bpm: demo.bpm, taal: demo.taal, beatsPerBar: 4, volume: 0.8, accentFirst: true, onBeat: (i) => setActive(i), sound: 'tabla', tonic });
           await m.start();
           const ms = ((demo.cycles ?? 2) * taal.matras * 60000) / demo.bpm;
           const t = window.setTimeout(() => m.stop(), ms);

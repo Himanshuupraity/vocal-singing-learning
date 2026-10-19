@@ -3,7 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { ApiError as GeminiApiError, FinishReason, GoogleGenAI } from '@google/genai';
 import { z } from 'zod';
 import type { ServerConfig } from '../config';
-import { SONG_PLAN_SYSTEM, TUTOR_SYSTEM, VOICE_FEEDBACK_SYSTEM } from '../lib/tutorPrompt';
+import { LIVE_COACH_SYSTEM, SONG_PLAN_SYSTEM, TUTOR_SYSTEM, VOICE_FEEDBACK_SYSTEM } from '../lib/tutorPrompt';
 
 const MessageSchema = z.object({
   role: z.enum(['user', 'assistant']),
@@ -33,6 +33,8 @@ const FALLBACK_MODELS = new Set(['claude-opus-5-5', 'claude-opus-5', 'claude-fab
 
 /** ~60 s of 16 kHz mono 16-bit WAV is ~1.9 MB, ~2.6 MB as base64. */
 const MAX_AUDIO_B64 = 3_500_000;
+/** ~25 s of the same WAV, for live-coach snippets. */
+const MAX_COACH_B64 = 1_100_000;
 
 export const VoiceFeedbackRequest = z.object({
   audio: z.string().min(100).max(MAX_AUDIO_B64).regex(/^[A-Za-z0-9+/]+={0,2}$/, 'Audio must be base64.'),
@@ -51,6 +53,23 @@ export const VoiceFeedbackRequest = z.object({
     swaras: z.array(z.object({ label: z.string().max(12), sec: z.number(), avgCents: z.number() })).max(12),
   }),
 });
+
+/** A short snippet from the Live Coach, plus the last few tips so the coach doesn't repeat itself. */
+export const CoachRequest = VoiceFeedbackRequest.extend({
+  audio: z.string().min(100).max(MAX_COACH_B64).regex(/^[A-Za-z0-9+/]+={0,2}$/, 'Audio must be base64.'),
+  target: z.string().max(40).default(''),
+  previous: z.array(z.string().max(500)).max(3).default([]),
+});
+
+const isWav = (b64: string) => {
+  const head = Buffer.from(b64.slice(0, 16), 'base64');
+  return head.subarray(0, 4).toString('latin1') === 'RIFF' && head.subarray(8, 12).toString('latin1') === 'WAVE';
+};
+
+function describeMeasured(m: z.infer<typeof VoiceFeedbackRequest>['measured']) {
+  return `App measurements of this clip: ${m.durationSec.toFixed(1)}s long, ${m.voicedSec.toFixed(1)}s of clear singing; range ${m.lowest ?? '—'} to ${m.highest ?? '—'}; steadiness ${m.steadinessCents === null ? 'not measured' : `${m.steadinessCents} cents typical wobble (lower = steadier)`}.
+Swaras held longest (time, average offset from the exact swara): ${m.swaras.map((s) => `${s.label} ${s.sec.toFixed(1)}s ${s.avgCents > 0 ? '+' : ''}${Math.round(s.avgCents)}¢`).join('; ') || 'none detected'}.`;
+}
 
 export type ClientFactory = (apiKey: string) => Anthropic;
 export type GeminiFactory = (apiKey: string) => GoogleGenAI;
@@ -244,19 +263,37 @@ export function tutorRouter(
     const parsed = VoiceFeedbackRequest.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'invalid_request', message: parsed.error.issues[0]?.message ?? 'Invalid request' });
     const v = parsed.data;
-    const head = Buffer.from(v.audio.slice(0, 16), 'base64');
-    if (head.subarray(0, 4).toString('latin1') !== 'RIFF' || head.subarray(8, 12).toString('latin1') !== 'WAVE') return res.status(400).json({ error: 'invalid_request', message: 'The recording must be a WAV file.' });
-    const m = v.measured;
+    if (!isWav(v.audio)) return res.status(400).json({ error: 'invalid_request', message: 'The recording must be a WAV file.' });
     const prompt = `Learner: SurSadhana level ${v.level}, Sa = ${v.tonic}. Language: ${v.language}.
 Recording: "${v.label || 'untitled'}"${v.exercise ? `, exercise: ${v.exercise}` : ''}.
-App measurements of this clip: ${m.durationSec.toFixed(1)}s long, ${m.voicedSec.toFixed(1)}s of clear singing; range ${m.lowest ?? '—'} to ${m.highest ?? '—'}; steadiness ${m.steadinessCents === null ? 'not measured' : `${m.steadinessCents} cents typical wobble (lower = steadier)`}.
-Swaras held longest (time, average offset from the exact swara): ${m.swaras.map((s) => `${s.label} ${s.sec.toFixed(1)}s ${s.avgCents > 0 ? '+' : ''}${Math.round(s.avgCents)}¢`).join('; ') || 'none detected'}.
+${describeMeasured(v.measured)}
 
 Listen to the recording and give your feedback.`;
     await streamGemini(
       (gemini ??= makeGemini(cfg.geminiKey)),
       cfg,
       { system: VOICE_FEEDBACK_SYSTEM, messages: [{ role: 'user', content: prompt }], maxTokens: 1500, audio: { mimeType: v.mimeType, data: v.audio } },
+      res,
+      req,
+    );
+  });
+
+  r.post('/tutor/coach', express.json({ limit: '1500kb' }), async (req, res) => {
+    if (!cfg.geminiKey) return res.status(503).json({ error: 'not_configured', message: 'The live AI coach needs GEMINI_API_KEY on the server.' });
+    const parsed = CoachRequest.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'invalid_request', message: parsed.error.issues[0]?.message ?? 'Invalid request' });
+    const v = parsed.data;
+    if (!isWav(v.audio)) return res.status(400).json({ error: 'invalid_request', message: 'The snippet must be a WAV file.' });
+    const prompt = `Learner: SurSadhana level ${v.level}, Sa = ${v.tonic}. Language: ${v.language}.
+What they are practising: ${v.target || 'free singing over the tanpura'}.
+${describeMeasured(v.measured)}
+${v.previous.length ? `Your last tips (don't repeat them; say if things improved):\n${v.previous.map((t) => `- ${t}`).join('\n')}` : 'This is your first tip in this session.'}
+
+Listen to the last few seconds and give one live tip.`;
+    await streamGemini(
+      (gemini ??= makeGemini(cfg.geminiKey)),
+      cfg,
+      { system: LIVE_COACH_SYSTEM, messages: [{ role: 'user', content: prompt }], maxTokens: 300, audio: { mimeType: v.mimeType, data: v.audio } },
       res,
       req,
     );

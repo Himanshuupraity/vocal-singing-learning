@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Metronome } from '../../audio/metronome';
+import { Drone } from '../../audio/drone';
 import { ensureRunning } from '../../audio/context';
-import { TAALS, vibhagOf, type BeatRole, type TaalId } from '../../music/taal';
+import { markerLabel, TAALS, TAAL_IDS, vibhagOf, type BeatRole, type TaalId } from '../../music/taal';
 import { useAppData } from '../../state/AppData';
 import { uid } from '../../lib/dates';
 import { Alert, Button, cx, inputClass } from '../ui';
@@ -12,18 +13,36 @@ export function MetronomeTool({ initialTaal = null, initialBpm = 70, context = '
   const [taal, setTaal] = useState<TaalId | null>(initialTaal);
   const [beatsPerBar, setBeatsPerBar] = useState(4);
   const [speak, setSpeak] = useState(false);
+  const [sound, setSound] = useState<'tabla' | 'click'>('tabla');
+  const [withDrone, setWithDrone] = useState(false);
   const [running, setRunning] = useState(false);
   const [beat, setBeat] = useState<{ i: number; role: BeatRole } | null>(null);
+  const { data } = useAppData();
+  const tonic = data.profile.tonic;
   const met = useRef<Metronome | null>(null);
+  const drone = useRef<Drone | null>(null);
   const speakRef = useRef(speak);
   speakRef.current = speak;
 
   const cycle = taal ? TAALS[taal].matras : beatsPerBar;
 
-  useEffect(() => () => met.current?.stop(), []);
+  useEffect(
+    () => () => {
+      met.current?.stop();
+      drone.current?.stop();
+    },
+    [],
+  );
   useEffect(() => {
-    met.current?.update({ bpm, taal, beatsPerBar });
-  }, [bpm, taal, beatsPerBar]);
+    met.current?.update({ bpm, taal, beatsPerBar, sound, tonic });
+  }, [bpm, taal, beatsPerBar, sound, tonic]);
+  useEffect(() => {
+    if (!running) return;
+    if (withDrone && !drone.current?.playing) {
+      drone.current = new Drone({ tonic, volume: data.settings.droneVolume * 0.6, mode: 'tanpura', firstString: 'P', cycleSec: 4.5 });
+      void drone.current.start();
+    } else if (!withDrone) drone.current?.stop();
+  }, [withDrone, running, tonic, data.settings.droneVolume]);
 
   const onBeat = (i: number, role: BeatRole) => {
     setBeat({ i, role });
@@ -39,11 +58,12 @@ export function MetronomeTool({ initialTaal = null, initialBpm = 70, context = '
   const toggle = async () => {
     if (running) {
       met.current?.stop();
+      drone.current?.stop();
       setRunning(false);
       setBeat(null);
       return;
     }
-    met.current = new Metronome({ bpm, taal, beatsPerBar, volume: 0.9, accentFirst: true, onBeat });
+    met.current = new Metronome({ bpm, taal, beatsPerBar, volume: 0.9, accentFirst: true, onBeat, sound, tonic });
     await met.current.start();
     setRunning(true);
   };
@@ -64,11 +84,22 @@ export function MetronomeTool({ initialTaal = null, initialBpm = 70, context = '
           <span className="font-medium">Mode</span>
           <select className={inputClass} value={taal ?? 'none'} onChange={(e) => setTaal(e.target.value === 'none' ? null : (e.target.value as TaalId))}>
             <option value="none">Plain metronome</option>
-            <option value="keharwa">Keharwa (8)</option>
-            <option value="dadra">Dadra (6)</option>
-            <option value="teentaal">Teentaal (16)</option>
+            {TAAL_IDS.map((id) => (
+              <option key={id} value={id}>
+                {TAALS[id].name} ({TAALS[id].matras})
+              </option>
+            ))}
           </select>
         </label>
+        {taal && (
+          <label className="space-y-1.5 text-sm">
+            <span className="font-medium">Sound</span>
+            <select className={inputClass} value={sound} onChange={(e) => setSound(e.target.value as 'tabla' | 'click')}>
+              <option value="tabla">Tabla (theka bols)</option>
+              <option value="click">Clicks (sam / tali / khali)</option>
+            </select>
+          </label>
+        )}
         {!taal && (
           <label className="space-y-1.5 text-sm">
             <span className="font-medium">Beats per cycle</span>
@@ -87,15 +118,19 @@ export function MetronomeTool({ initialTaal = null, initialBpm = 70, context = '
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={speak} onChange={(e) => setSpeak(e.target.checked)} /> Speak the beat numbers (works best below ~90 bpm; speech may lag slightly)
       </label>
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={withDrone} onChange={(e) => setWithDrone(e.target.checked)} /> Play the tanpura too, so you can sing along with sur and laya together
+      </label>
 
       {def && <p className="rounded-xl bg-surface-2 p-3 text-sm">{def.description}</p>}
+      {def && sound === 'tabla' && <p className="text-xs text-muted">The tabla is synthesized in your browser (not a recording) and tuned to your Sa ({tonic.note}). Bass bols like Dha and Dhin include the left drum; Tin, Ta and Na do not, which is how you hear khali.</p>}
 
       <div className="flex flex-wrap gap-3" aria-label="Beat cycle">
         {(def ? def.vibhags : [cycle]).map((len, v) => {
           const start = def ? def.vibhags.slice(0, v).reduce((s, x) => s + x, 0) : 0;
           return (
             <div key={v} className="rounded-xl border border-border p-2">
-              {def && <p className="mb-1 text-center text-xs font-semibold text-muted">{def.markers[v] === 'X' ? 'X (sam · clap)' : def.markers[v] === 0 ? '0 (khali · wave)' : `${def.markers[v]} (tali · clap)`}</p>}
+              {def && <p className="mb-1 text-center text-xs font-semibold text-muted">{markerLabel(def, v)}</p>}
               <div className="flex gap-1.5">
                 {Array.from({ length: len }, (_, k) => {
                   const i = start + k;

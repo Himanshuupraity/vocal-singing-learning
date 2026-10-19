@@ -34,7 +34,8 @@ export function SargamPlayer({ initialPattern, initialBpm }: { initialPattern?: 
   const [err, setErr] = useState<string | null>(null);
   const handle = useRef<SequenceHandle | null>(null);
 
-  const notes = useMemo(() => (presetId === 'custom' && initialPattern ? initialPattern : PRESETS.find((p) => p.id === presetId)?.notes ?? SCALE), [presetId, initialPattern]);
+  const mine = useMemo(() => data.patterns.map((p) => ({ id: `my:${p.id}`, label: p.name, notes: p.notes })), [data.patterns]);
+  const notes = useMemo(() => (presetId === 'custom' && initialPattern ? initialPattern : [...mine, ...PRESETS].find((p) => p.id === presetId)?.notes ?? SCALE), [presetId, initialPattern, mine]);
 
   useEffect(() => () => handle.current?.stop(), []);
   useEffect(() => {
@@ -69,12 +70,23 @@ export function SargamPlayer({ initialPattern, initialBpm }: { initialPattern?: 
         <label className="space-y-1.5 text-sm sm:col-span-2">
           <span className="font-medium">Pattern</span>
           <select className={inputClass} value={presetId} onChange={(e) => setPresetId(e.target.value)}>
-            {initialPattern && <option value="custom">This lesson&apos;s pattern</option>}
-            {PRESETS.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
-              </option>
-            ))}
+            {initialPattern && <option value="custom">This pattern</option>}
+            {mine.length > 0 && (
+              <optgroup label="My exercises">
+                {mine.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.label}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            <optgroup label="Sargam">
+              {PRESETS.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+            </optgroup>
           </select>
         </label>
         <TonicPicker />
