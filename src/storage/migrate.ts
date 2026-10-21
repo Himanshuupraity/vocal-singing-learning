@@ -56,6 +56,7 @@ export function migrate(raw: unknown): LoadResult {
       quizBest: typeof lp.quizBest === 'number' ? lp.quizBest : undefined,
       quizAttempts: typeof lp.quizAttempts === 'number' ? lp.quizAttempts : 0,
       selfChecks: Array.isArray(lp.selfChecks) ? (lp.selfChecks.filter((x) => typeof x === 'string') as string[]) : [],
+      guidedSteps: Array.isArray(lp.guidedSteps) ? (lp.guidedSteps.filter((x) => Number.isInteger(x)) as number[]) : undefined,
       lastVisited: typeof lp.lastVisited === 'string' ? lp.lastVisited : undefined,
       practiceCount: typeof lp.practiceCount === 'number' ? lp.practiceCount : 0,
     };

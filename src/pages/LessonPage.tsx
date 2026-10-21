@@ -20,7 +20,6 @@ export default function LessonPage() {
   const { data, update } = useAppData();
   const [lang, setLang] = useState<'hinglish' | 'english' | 'hindi'>(data.profile.language);
   const [quizKey, setQuizKey] = useState(0);
-  const [stepsDone, setStepsDone] = useState<number[]>([]);
   const practiceRef = useRef<HTMLDivElement>(null);
   const status = lesson ? lessonStatus(data, lesson) : 'locked';
   usePracticeTimer('lesson', lesson?.title, !!lesson && status !== 'locked');
@@ -31,7 +30,6 @@ export default function LessonPage() {
       const lp = (d.lessons[lesson.id] ??= { quizAttempts: 0, selfChecks: [], practiceCount: 0 });
       lp.lastVisited = new Date().toISOString();
     });
-    setStepsDone([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lesson?.id]);
 
@@ -53,6 +51,14 @@ export default function LessonPage() {
   const ip = lesson.independentPractice;
   const shownLang = lang === 'hindi' && !lesson.explanation.hindi ? 'hinglish' : lang;
 
+  const stepsDone = lp?.guidedSteps ?? [];
+  const toggleStep = (i: number, on: boolean) =>
+    update((d) => {
+      const p = (d.lessons[lesson.id] ??= { quizAttempts: 0, selfChecks: [], practiceCount: 0 });
+      const cur = p.guidedSteps ?? [];
+      p.guidedSteps = on ? [...new Set([...cur, i])] : cur.filter((x) => x !== i);
+    });
+
   const toggleCheck = (item: string, on: boolean) =>
     update((d) => {
       const p = (d.lessons[lesson.id] ??= { quizAttempts: 0, selfChecks: [], practiceCount: 0 });
@@ -69,8 +75,8 @@ export default function LessonPage() {
     update((d) => {
       const p = (d.lessons[lesson.id] ??= { quizAttempts: 0, selfChecks: [], practiceCount: 0 });
       p.practiceCount += 1;
+      p.guidedSteps = [];
     });
-    setStepsDone([]);
     setQuizKey((k) => k + 1);
     practiceRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
@@ -150,7 +156,7 @@ export default function LessonPage() {
             {lesson.guidedSteps.map((s, i) => (
               <li key={i}>
                 <label className="flex cursor-pointer items-start gap-3 rounded-xl p-2 hover:bg-surface-2">
-                  <input type="checkbox" className="mt-1" checked={stepsDone.includes(i)} onChange={(e) => setStepsDone((x) => (e.target.checked ? [...x, i] : x.filter((y) => y !== i)))} />
+                  <input type="checkbox" className="mt-1" checked={stepsDone.includes(i)} onChange={(e) => toggleStep(i, e.target.checked)} />
                   <span className={cx(stepsDone.includes(i) && 'text-muted line-through')}>
                     <span className="font-semibold">{i + 1}.</span> {s}
                   </span>

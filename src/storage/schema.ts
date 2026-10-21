@@ -48,6 +48,8 @@ export interface LessonProgress {
   quizBest?: number;
   quizAttempts: number;
   selfChecks: string[];
+  /** Indexes of guided-practice steps ticked off (cleared on "practise again") */
+  guidedSteps?: number[];
   lastVisited?: string;
   practiceCount: number;
 }
